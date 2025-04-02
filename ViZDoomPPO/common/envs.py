@@ -3,8 +3,10 @@ import typing as t
 import cv2
 import numpy as np
 import vizdoom
-from gym import Env
-from gym import spaces
+#from gym import Env
+from gymnasium import Env
+#from gym import spaces
+from gymnasium import spaces
 from stable_baselines3.common import vec_env
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.ppo import ppo, policies
