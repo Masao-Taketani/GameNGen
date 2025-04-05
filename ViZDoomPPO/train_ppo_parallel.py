@@ -132,6 +132,7 @@ class DoomWithBotsShaped(envs.DoomWithBots):
 
         state = super().reset()
 
+
         self.last_health = 100
         self.last_x, self.last_y = self._get_player_pos()
         self.last_armor = self.last_frags = self.total_rew = self.deaths = 0
