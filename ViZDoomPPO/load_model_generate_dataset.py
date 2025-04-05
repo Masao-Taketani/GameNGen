@@ -34,7 +34,6 @@ import pyarrow.parquet as pq
 import numpy as np
 from datasets import Dataset, DatasetDict
 import glob
-import pyarrow.parquet as pq
 from train_ppo_parallel import DoomWithBotsCurriculum, game_instance
 from stable_baselines3.common.vec_env import (
     VecTransposeImage,
