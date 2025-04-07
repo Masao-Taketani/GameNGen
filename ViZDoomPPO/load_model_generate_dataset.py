@@ -240,6 +240,7 @@ def create_hf_dataset_from_parquets(parquet_dir: str, repo_id: str) -> None:
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generate GIF or Parquet file from pretrained PPO agent")
     parser.add_argument("--output", choices=["gif", "parquet"], required=True, help="Output format")
+    parser.add_argument("--output_dir", type=str, default="./dataset", required=True, help="Output directory of generated data")
     parser.add_argument("--episodes", type=int, default=1, help="Number of episodes to run")
     parser.add_argument("--upload", action="store_true", help="Upload the output to Hugging Face Hub")
     parser.add_argument("--hf_token", help="Hugging Face API token (optional if HF_TOKEN env variable is set)")
@@ -273,8 +274,7 @@ def main():
         output_file = "./output.gif"
         make_gif(agent2, output_file, eval_env_args, num_episodes=args.episodes)
     else:
-        output_dir = "./dataset"
-        make_pkls_dataset(agent2, output_dir, num_episodes=args.episodes, eval_env_args=eval_env_args)
+        make_pkls_dataset(agent2, args.output_dir, num_episodes=args.episodes, eval_env_args=eval_env_args)
 
     if args.upload:
         if not args.hf_repo:
@@ -284,7 +284,7 @@ def main():
                 upload_to_hf(output_file, args.hf_repo)
             else:
                 # upload_to_hf(parquet_path, args.hf_repo, hf_token)
-                create_hf_dataset_from_parquets(output_dir, repo_id=args.hf_repo)
+                create_hf_dataset_from_parquets(args.output_dir, repo_id=args.hf_repo)
 
 
 if __name__ == "__main__":
