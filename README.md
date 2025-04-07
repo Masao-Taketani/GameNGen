@@ -30,7 +30,8 @@ conda create -n vizdoom python=3.11 -y
 conda activate vizdoom
 apt update && apt install libgl1 swig g++ -y
 pip install setuptools==65.5.0 pip==21 wheel==0.38.0
-pip install -r requirements.txt
+cd ViZDoomPPO/
+pip install -r vizdoom_requirements.txt
 ```
 
 Then, run the following command to train an agent on vizdoom:
