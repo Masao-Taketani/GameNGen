@@ -1,8 +1,16 @@
-# GameNGen
+# Diffusion Models Are Real-Time Game Engines
 
-This is an unofficial repo of GameNGen.
+This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I have referred to [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main) in order to create this repo.
 
+## Modifications
+Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main).
+- Fixed the environment setup with Anaconda and write down the precise commands in order to properly reproduce the code.
+- Fixed the training steps to properly train the PPO agents within VizDoom environment
 
+## To Do
+- Enable to generate dataset with multiprocessing
+- Enable distributed training
+- Implement playable generative environment
 
 ## Artifacts
 
@@ -104,3 +112,11 @@ We initially fill the buffer using the small dataset, and sample actions from th
 ```
 python run_autoregressive.py --model_folder arnaudstiegler/sd-model-gameNgen-60ksteps
 ```
+
+## References
+
+### Paper
+- [Diffusion Models Are Real-Time Game Engines](https://arxiv.org/abs/2408.14837)
+
+### GitHub Repos
+- [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main)
