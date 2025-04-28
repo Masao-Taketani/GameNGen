@@ -69,7 +69,7 @@ pip install -r diffusion_requirements.txt
 
 #### Single GPU
 If you only have single gpu, follow the instruction below to train the diffusion model.
-Debug training script with single GPU.
+Debug training with single GPU.
 ```
 sh train_diffusion_scripts/debug_single_gpu.sh
 ```
@@ -80,15 +80,15 @@ sh train_diffusion_scripts/single_gpu.sh
 ```
 
 #### Multiple GPUs
-If you more than single GPU, follow the instruction below to train the diffusion model.
-Debug training script with multiple GPUs.
+If you have more than single GPU, follow the instruction below to train the diffusion model.
+Debug training with multiple GPUs.
 ```
-sh train_diffusion_scripts/debug_single_gpu.sh
+sh train_diffusion_scripts/debug_multi_gpus.sh
 ```
 
 Start full training with multiple GPUs.
 ```
-sh train_diffusion_scripts/single_gpu.sh
+sh train_diffusion_scripts/multi_gpus.sh
 ```
 
 ### Train the auto-encoder
