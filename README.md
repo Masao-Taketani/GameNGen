@@ -31,7 +31,6 @@ Vizdoom Agent:
 
 ### Generate the training data
 
-#### Environment
 First, follow the commands below in order to create an environment to train Vizdoom agent.
 ```
 conda create -n vizdoom python=3.11 -y
@@ -59,6 +58,14 @@ python load_model_generate_dataset.py --episodes 1 --output gif
 
 
 ### Train the diffusion model
+
+Second step is that follow the commands below in order to create an environment to train diffusion model.
+```
+conda deactivate
+conda create -n diffusion python=3.11 -y
+conda activate diffusion
+pip install -r diffusion_requirements.txt
+```
 
 Debug on a single sample:
 ```
