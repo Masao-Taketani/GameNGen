@@ -1,0 +1,11 @@
+python train_text_to_image.py  \
+    --dataset_name arnaudstiegler/vizdoom-episode  \
+    --gradient_checkpointing  \
+    --train_batch_size 12  \
+    --learning_rate 5e-5  \
+    --num_train_epochs 1500  \
+    --validation_steps 250  \
+    --dataloader_num_workers 18 \
+    --max_train_samples 2 \
+    --use_cfg \
+    --report_to wandb

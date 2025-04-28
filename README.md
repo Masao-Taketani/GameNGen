@@ -67,36 +67,28 @@ conda activate diffusion
 pip install -r diffusion_requirements.txt
 ```
 
-Debug on a single sample:
+#### Single GPU
+If you only have single gpu, follow the instruction below to train the diffusion model.
+Debug training script with single GPU.
 ```
-python train_text_to_image.py  \
-    --dataset_name arnaudstiegler/vizdoom-episode  \
-    --gradient_checkpointing  \
-    --train_batch_size 12  \
-    --learning_rate 5e-5  \
-    --num_train_epochs 1500  \
-    --validation_steps 250  \
-    --dataloader_num_workers 18 \
-    --max_train_samples 2 \
-    --use_cfg \
-    --report_to wandb
+sh train_diffusion_scripts/debug_single_gpu.sh
 ```
 
-Full training
+Start full training with single GPU.
 ```
-python train_text_to_image.py \
-    --dataset_name arnaudstiegler/vizdoom-500-episodes-skipframe-4-lvl5 \
-    --gradient_checkpointing \
-    --learning_rate 5e-5 \
-    --train_batch_size 12 \
-    --dataloader_num_workers 18 \
-    --num_train_epochs 3 \
-    --validation_steps 1000 \
-    --use_cfg \
-    --output_dir sd-model-finetuned \
-    --push_to_hub \
-    --lr_scheduler cosine \
-    --report_to wandb
+sh train_diffusion_scripts/single_gpu.sh
+```
+
+#### Multiple GPUs
+If you more than single GPU, follow the instruction below to train the diffusion model.
+Debug training script with multiple GPUs.
+```
+sh train_diffusion_scripts/debug_single_gpu.sh
+```
+
+Start full training with multiple GPUs.
+```
+sh train_diffusion_scripts/single_gpu.sh
 ```
 
 ### Train the auto-encoder
