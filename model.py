@@ -1,5 +1,6 @@
 import os
 import torch
+from torch.nn.parallel import DistributedDataParallel
 import textwrap
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from transformers import CLIPTokenizer, CLIPTextModel
@@ -181,7 +182,10 @@ def save_model(
     noise_scheduler: DDIMScheduler,
     action_embedding: torch.nn.Embedding,
 ) -> None:
-    unet.save_pretrained(os.path.join(output_dir, "unet"))
+    if isinstance(unet, DistributedDataParallel):
+        unet.module.save_pretrained(os.path.join(output_dir, "unet"))
+    else:
+        unet.save_pretrained(os.path.join(output_dir, "unet"))
     vae.save_pretrained(os.path.join(output_dir, "vae"))
     noise_scheduler.save_pretrained(os.path.join(output_dir, "noise_scheduler"))
     save_file(
