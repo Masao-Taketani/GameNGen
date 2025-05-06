@@ -12,6 +12,11 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - [x] Enable distributed training
 - [ ] Implement playable generative environments
 - [ ] Utilize SANA-Sprint architecture for diffusion training
+- [ ] Try using the original settings
+  - **Diffusion Models**
+  - [ ] 2e-5 for the learning rate
+  - [ ] Adafactor optimizer
+  - [ ] A context length of 64 
 
 ## Artifacts
 
