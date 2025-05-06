@@ -8,9 +8,11 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - Fixed the training steps to properly train the PPO agents within VizDoom environment
 
 ## To Do
-- Enable to generate dataset with multiprocessing
-- Enable distributed training
-- Implement playable generative environment
+- [ ] Enable to collect VizDoom dataset with multiprocessing during RL policy training
+- [x] Enable distributed training
+- [ ] Implement playable generative environments
+- [ ] Use all the timesteps of generated observations as diffusion training objectives instead of using only the last frame
+- [ ] Utilize SANA-Sprint architecture for diffusion training
 
 ## Artifacts
 
@@ -119,3 +121,4 @@ python run_autoregressive.py --model_folder arnaudstiegler/sd-model-gameNgen-60k
 
 ### GitHub Repos
 - [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main)
+- [lkiel/rl-doom](https://github.com/lkiel/rl-doom)
