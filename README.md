@@ -11,7 +11,6 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - [ ] Enable to collect VizDoom dataset with multiprocessing during RL policy training
 - [x] Enable distributed training
 - [ ] Implement playable generative environments
-- [ ] Use all the timesteps of generated observations as diffusion training objectives instead of using only the last frame
 - [ ] Utilize SANA-Sprint architecture for diffusion training
 
 ## Artifacts
