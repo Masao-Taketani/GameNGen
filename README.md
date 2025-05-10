@@ -13,10 +13,12 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - [ ] Implement playable generative environments
 - [ ] Utilize SANA-Sprint architecture for diffusion training
 - [ ] Try using the original settings
+  - **VizDoom**
+  - [ ] Add `MOVE_BACKWARD` action 
   - **Diffusion Models**
   - [ ] 2e-5 for the learning rate
   - [ ] Adafactor optimizer
-  - [ ] A context length of 64 
+  - [ ] A context length of 64
 
 ## Artifacts
 
