@@ -299,7 +299,8 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         n_bots,
         shaping,
         env_id,
-        base_out_dir,
+        train_or_eval,
+        out_base_dir,
         initial_level=0,
         max_level=5,
         rolling_mean_length=10,
@@ -315,8 +316,10 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         self.rolling_mean_length = rolling_mean_length
         self.last_rewards = deque(maxlen=rolling_mean_length)
         self.env_id = env_id
-        self.base_out_dir = base_out_dir
-        self.output_dir = os.path.join(self.base_out_dir, self.level, self.env_id)
+        self.train_or_eval = train_or_eval
+        self.out_base_dir = out_base_dir
+        self.episode_id = 0
+        self.output_dir = os.path.join(self.out_base_dir, self.train_or_eval, f"level_{self.level}/{self.env_id}")
         # Create a directory to save collected data
         os.makedirs(self.output_dir, exist_ok=True)
         # Init lists to save data at the end of each episode
@@ -360,7 +363,7 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
             self.game.send_game_command(f"pukename change_difficulty {self.level}")
             self.last_rewards = deque(maxlen=self.rolling_mean_length)
             # Create a directory to save collected data for a new level
-            self.output_dir = os.path.join(self.base_out_dir, self.level, self.env_id)
+            self.output_dir = os.path.join(self.out_base_dir, self.train_or_eval, f"{self.level}/{self.env_id}")
             os.makedirs(self.output_dir, exist_ok=True)
         else:
             print(f"{self.name} already at max level!")
@@ -371,7 +374,7 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
             'frames': [self.compress_image(frame) for frame in self.frames],
             'actions': self.actions,
         }
-        self.save_episodes_to_parquet(episode_data, output_dir)
+        self.save_episodes_to_parquet(episode_data)
         # init variables to save for next espisode
         self.frames = []
         self.actions = []
@@ -383,7 +386,7 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         img.save(buffer, format=format, quality=quality)
         return buffer.getvalue()
 
-    def save_episodes_to_parquet(self, episode_data: dict, output_parquet: str):
+    def save_episodes_to_parquet(self, episode_data: dict):
         """Save batch with compressed binary images instead of base64"""
         processed_data = {
             'frames': [frame for frame in episode_data['frames']],
@@ -393,7 +396,8 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         df = pd.DataFrame.from_dict(processed_data)
         table = pa.Table.from_pandas(df)
         
-        filename = f'{output_parquet}/level_{self.level}_.parquet'
+        filename = os.path.join(self.output_dir, f'episode_{self.episode_id}_.parquet')
+        self.episode_id += 1
         pq.write_table(table, filename, compression='zstd')
 
 
@@ -442,7 +446,7 @@ def vec_env_with_bots_curriculum(n_envs=1, **kwargs) -> VecTransposeImage:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run training RL agent and data collection program")
     parser.add_argument(
-        "--base_out_dir",
+        "--out_base_dir",
         type=str,
         default="nanoGPT",
         help="Specify the parent directory of collected data during training.",
@@ -469,7 +473,7 @@ if __name__ == "__main__":
         "initial_level": 1,
         "max_level": 5,
         "train_or_eval": "train",
-        "base_out_dir": args.base_out_dir.
+        "out_base_dir": args.out_base_dir,
     }
 
     # In the evaluation environment we measure frags only.
