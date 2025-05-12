@@ -28,12 +28,14 @@ import multiprocessing
 import pandas as pd
 import io
 import os
+import shutil
 import pyarrow as pa
 import pyarrow.parquet as pq
 from PIL import Image
 import argparse
 
 
+ACTION_REPEAT = 4
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device=torch.device("mps")
 print(f"Using device: {device}")
@@ -298,7 +300,6 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         frame_skip,
         n_bots,
         shaping,
-        env_id,
         train_or_eval,
         out_base_dir,
         initial_level=0,
@@ -315,22 +316,28 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         self.max_level = max_level
         self.rolling_mean_length = rolling_mean_length
         self.last_rewards = deque(maxlen=rolling_mean_length)
-        self.env_id = env_id
         self.train_or_eval = train_or_eval
         self.out_base_dir = out_base_dir
         self.episode_id = 0
-        self.output_dir = os.path.join(self.out_base_dir, self.train_or_eval, f"level_{self.level}/{self.env_id}")
+        tmp_path = os.path.join(self.out_base_dir, self.train_or_eval, f"level_{self.level}")
+        self.env_id = len(os.listdir(tmp_path)) if os.path.exists(tmp_path) else 0
+        self.output_dir = os.path.join(tmp_path, str(self.env_id))
         # Create a directory to save collected data
         os.makedirs(self.output_dir, exist_ok=True)
         # Init lists to save data at the end of each episode
         self.frames = []
         self.actions = []
+        self.step_ct = 0
+        self.current_action = None
 
     def step(self, action, array=False):
-        # Perform action step as usual
+        # Repeat the same action for the specified times as ACTION_REPEAT 
+        if self.step_ct % ACTION_REPEAT == 0: self.current_action = action
         self.frames.append(self.game.get_state().screen_buffer)
-        self.actions.append(int(action.item()))
-        state, reward, done, infos = super().step(action, array)
+        self.actions.append(int(self.current_action.item()))
+        #print("[debug] env_id:", self.env_id, "self.current_action:", self.current_action)
+        state, reward, done, infos = super().step(self.current_action, array)
+        self.step_ct += 1
         # After an episode, check whether difficulty should be increased.
         if done:
             self.save_episode_data()
@@ -378,6 +385,8 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         # init variables to save for next espisode
         self.frames = []
         self.actions = []
+        self.step_ct = 0
+        self.current_action = None
 
     def compress_image(self, image_array: np.ndarray, format='JPEG', quality=85):
         """Compress image using PIL with JPEG compression"""
@@ -433,14 +442,9 @@ def env_with_bots_curriculum(scenario, **kwargs) -> envs.DoomEnv:
 
 def vec_env_with_bots_curriculum(n_envs=1, **kwargs) -> VecTransposeImage:
     """Wraps a Doom game instance in a vectorized environment with shaped rewards and curriculum."""
-    #return VecTransposeImage(
-    #    SubprocVecEnv([lambda: env_with_bots_curriculum(**kwargs) for _ in range(n_envs)])
-    #)
-    tmp = []
-    for env_id in range(n_envs):
-        kwargs["env_id"] = env_id
-        tmp.append(env_with_bots_curriculum(**kwargs))
-    return VecTransposeImage(SubprocVecEnv(tmp))
+    return VecTransposeImage(
+        SubprocVecEnv([lambda: env_with_bots_curriculum(**kwargs) for _ in range(n_envs)])
+    )
 
 
 if __name__ == "__main__":
@@ -481,7 +485,13 @@ if __name__ == "__main__":
     eval_env_args["shaping"] = False
     eval_env_args["train_or_eval"] = "eval"
 
-    n_envs = multiprocessing.cpu_count() - 1
+    # Make sure to remove all directories that already exist in the output path
+    if os.path.exists(os.path.join(args.out_base_dir, "train")):
+        shutil.rmtree(os.path.join(args.out_base_dir, "train"))
+    if os.path.exists(os.path.join(args.out_base_dir, "eval")):
+        shutil.rmtree(os.path.join(args.out_base_dir, "eval"))
+    #n_envs = multiprocessing.cpu_count() - 1
+    n_envs = 3
     # Create environments with bots and shaping.
     env = vec_env_with_bots_curriculum(
         n_envs, **env_args
