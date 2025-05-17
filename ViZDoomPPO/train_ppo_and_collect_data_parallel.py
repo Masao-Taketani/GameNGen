@@ -333,12 +333,11 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
     def step(self, action, array=False):
         # Repeat the same action for the specified times as ACTION_REPEAT 
         if self.step_ct % ACTION_REPEAT == 0: self.current_action = action
-        self.frames.append(self.game.get_state().screen_buffer)
-        self.actions.append(int(self.current_action.item()))
-        #print("[debug] env_id:", self.env_id, "self.current_action:", self.current_action)
+        if not self.game.is_episode_finished():
+            self.frames.append(self.game.get_state().screen_buffer)
+            self.actions.append(int(self.current_action.item()))
         state, reward, done, infos = super().step(self.current_action, array)
         self.step_ct += 1
-        # After an episode, check whether difficulty should be increased.
         if done:
             self.save_episode_data()
             self.last_rewards.append(self.total_rew)
@@ -376,7 +375,6 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
             print(f"{self.name} already at max level!")
 
     def save_episode_data(self):
-        self.frames.append(self.game.get_state().screen_buffer)
         episode_data = {
             'frames': [self.compress_image(frame) for frame in self.frames],
             'actions': self.actions,
