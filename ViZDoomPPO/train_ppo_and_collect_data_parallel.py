@@ -450,8 +450,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--out_base_dir",
         type=str,
-        default="nanoGPT",
+        default="dataset",
         help="Specify the parent directory of collected data during training.",
+    )
+    parser.add_argument(
+        "--n_train_envs",
+        type=int,
+        default=16,
+        help="Specify the number of parallel environments to train the agent.",
+    )
+    parser.add_argument(
+        "--n_eval_envs",
+        type=int,
+        default=1,
+        help="Specify the number of parallel environments to evaluate the agent.",
     )
     args = parser.parse_args()
     scenario = "deathmatch_simple"
@@ -468,7 +480,7 @@ if __name__ == "__main__":
     # Environment parameters.
     env_args = {
         "scenario": scenario,
-        "frame_skip": 4,
+        "frame_skip": 1,
         "frame_processor": envs.default_frame_processor,
         "n_bots": 6,
         "shaping": True,
@@ -488,13 +500,13 @@ if __name__ == "__main__":
         shutil.rmtree(os.path.join(args.out_base_dir, "train"))
     if os.path.exists(os.path.join(args.out_base_dir, "eval")):
         shutil.rmtree(os.path.join(args.out_base_dir, "eval"))
-    #n_envs = multiprocessing.cpu_count() - 1
-    n_envs = 3
+
     # Create environments with bots and shaping.
     env = vec_env_with_bots_curriculum(
-        n_envs, **env_args
-    )  # You can increase the number of parallel environments
-    eval_env = vec_env_with_bots_curriculum(n_envs, **eval_env_args)
+        args.n_train_envs, **env_args
+    )  
+    # You can increase the number of parallel environments
+    eval_env = vec_env_with_bots_curriculum(args.n_eval_envs, **eval_env_args)
 
     agent = envs.solve_env(
         env,
