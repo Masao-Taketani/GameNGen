@@ -230,7 +230,7 @@ def solve_env(env: vec_env.VecTransposeImage, eval_env: vec_env.VecTransposeImag
     )
 
     # Set up progress bar
-    total_timesteps = 70_000_000
+    total_timesteps = 50_000_000
     pbar = tqdm(total=total_timesteps, desc="Training Progress")
     class ProgressBarCallback(BaseCallback):
         def __init__(self, pbar):

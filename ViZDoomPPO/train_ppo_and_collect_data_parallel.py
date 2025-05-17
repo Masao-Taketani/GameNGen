@@ -403,7 +403,7 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         df = pd.DataFrame.from_dict(processed_data)
         table = pa.Table.from_pandas(df)
         
-        filename = os.path.join(self.output_dir, f'episode_{self.episode_id}_.parquet')
+        filename = os.path.join(self.output_dir, f'episode_{self.episode_id}.parquet')
         self.episode_id += 1
         pq.write_table(table, filename, compression='zstd')
 
