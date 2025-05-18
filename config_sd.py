@@ -1,6 +1,6 @@
 # Number of past frames/actions we provide
 # Beware that there's a hard limit coming from the dataset
-BUFFER_SIZE = 9
+BUFFER_SIZE = 64
 # Given by the paper
 ZERO_OUT_ACTION_CONDITIONING_PROB = 0.1
 
@@ -11,7 +11,7 @@ WIDTH = 320
 CFG_GUIDANCE_SCALE = 1.5
 
 # Default number of inference steps for diffusion
-DEFAULT_NUM_INFERENCE_STEPS = 10
+DEFAULT_NUM_INFERENCE_STEPS = 4
 
 # Conditional Image noise parameters
 # Those values are the same as in the paper

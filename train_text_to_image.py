@@ -28,7 +28,6 @@ import diffusers
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.utils.checkpoint
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
