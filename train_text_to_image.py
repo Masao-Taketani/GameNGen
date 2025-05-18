@@ -297,25 +297,34 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--use_adamw",
+        type=str,
+        action="store_true",
+        help=(
+            "Whether or not to use AdamW optimizer. If both 'use_8bit_adam' and 'use_adamw' are True, 8bit Adam is prioritized. "
+            "If both are False, the default optimizer Adafactor, which is used in the paper, is used."
+        ),
+    )
+    parser.add_argument(
         "--adam_beta1",
         type=float,
         default=0.9,
-        help="The beta1 parameter for the Adam optimizer.",
+        help="The beta1 parameter for the Adam optimizer. If 'adafactor' optimizer is used, this param is ignored.",
     )
     parser.add_argument(
         "--adam_beta2",
         type=float,
         default=0.999,
-        help="The beta2 parameter for the Adam optimizer.",
+        help="The beta2 parameter for the Adam optimizer. If 'adafactor' optimizer is used, this param is ignored.",
     )
     parser.add_argument(
-        "--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use."
+        "--weight_decay", type=float, default=0.0, help="Weight decay to use."
     )
     parser.add_argument(
         "--adam_epsilon",
         type=float,
         default=1e-08,
-        help="Epsilon value for the Adam optimizer",
+        help="Epsilon value for the optimizer",
     )
     parser.add_argument(
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
@@ -616,24 +625,39 @@ def main():
 
         optimizer_cls = bnb.optim.AdamW8bit
     else:
-        optimizer_cls = torch.optim.AdamW
+        optimizer_cls = torch.optim.AdamW if args.use_adamw else torch.optim.Adafactor
 
     if args.skip_action_conditioning:
-        optimizer = optimizer_cls(
-            unet.parameters(),
-            lr=args.learning_rate,
-            betas=(args.adam_beta1, args.adam_beta2),
-            weight_decay=args.adam_weight_decay,
-            eps=args.adam_epsilon,
-        )
+        if args.use_8bit_adam or args.use_adamw:
+            optimizer = optimizer_cls(
+                unet.parameters(),
+                lr=args.learning_rate,
+                betas=(args.adam_beta1, args.adam_beta2),
+                weight_decay=args.weight_decay,
+                eps=args.adam_epsilon,
+            )
+        else:
+            optimizer = optimizer_cls(unet.parameters(),
+                                      scale_parameter=False, 
+                                      relative_step=False, 
+                                      warmup_init=False, 
+                                      lr=args.learning_rate)
     else:
-        optimizer = optimizer_cls(
-            list(unet.parameters()) + list(action_embedding.parameters()),
-            lr=args.learning_rate,
-            betas=(args.adam_beta1, args.adam_beta2),
-            weight_decay=args.adam_weight_decay,
-            eps=args.adam_epsilon,
-        )
+        if args.use_8bit_adam or args.use_adamw:
+            optimizer = optimizer_cls(
+                list(unet.parameters()) + list(action_embedding.parameters()),
+                lr=args.learning_rate,
+                betas=(args.adam_beta1, args.adam_beta2),
+                weight_decay=args.weight_decay,
+                eps=args.adam_epsilon,
+            )
+        else:
+            optimizer = optimizer_cls(list(unet.parameters()) + list(action_embedding.parameters()),
+                                      scale_parameter=False, 
+                                      relative_step=False, 
+                                      warmup_init=False, 
+                                      lr=args.learning_rate
+            )
 
     train_dataloader = get_dataloader(
         dataset_name=args.dataset_name,
@@ -724,10 +748,11 @@ def main():
     logger.info(f"  SNR gamma = {args.snr_gamma}")
     logger.info(f"  Max grad norm = {args.max_grad_norm}")
     logger.info(f"  Learning rate = {args.learning_rate}")
-    logger.info(f"  Adam beta 1 = {args.adam_beta1}")
-    logger.info(f"  Adam beta 2 = {args.adam_beta2}")
-    logger.info(f"  Adam weight decay = {args.adam_weight_decay}")
-    logger.info(f"  Adam epsilon = {args.adam_epsilon}")
+    if args.use_8bit_adam or args.use_adamw:
+        logger.info(f"  Adam beta 1 = {args.adam_beta1}")
+        logger.info(f"  Adam beta 2 = {args.adam_beta2}")
+        logger.info(f"  Adam epsilon = {args.adam_epsilon}")
+    logger.info(f"  weight decay = {args.weight_decay}")
     logger.info(f"  Lr scheduler = {args.lr_scheduler}")
     logger.info(f"  Lr warmup steps = {args.lr_warmup_steps}")
     logger.info(f"  Report to = {args.report_to}")

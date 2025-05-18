@@ -1,7 +1,7 @@
 python train_text_to_image.py \
     --dataset_name arnaudstiegler/vizdoom-500-episodes-skipframe-4-lvl5 \
     --gradient_checkpointing \
-    --learning_rate 5e-5 \
+    --learning_rate 2e-5 \
     --train_batch_size 12 \
     --dataloader_num_workers 18 \
     --num_train_epochs 3 \
