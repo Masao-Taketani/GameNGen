@@ -309,13 +309,13 @@ def parse_args():
         "--adam_beta1",
         type=float,
         default=0.9,
-        help="The beta1 parameter for the Adam optimizer. If 'adafactor' optimizer is used, this param is ignored.",
+        help="The beta1 parameter for the Adam optimizer. If Adafactor optimizer is used, this param is ignored.",
     )
     parser.add_argument(
         "--adam_beta2",
         type=float,
         default=0.999,
-        help="The beta2 parameter for the Adam optimizer. If 'adafactor' optimizer is used, this param is ignored.",
+        help="The beta2 parameter for the Adam optimizer. If Adafactor optimizer is used, this param is ignored.",
     )
     parser.add_argument(
         "--weight_decay", type=float, default=0.0, help="Weight decay to use."
@@ -324,7 +324,7 @@ def parse_args():
         "--adam_epsilon",
         type=float,
         default=1e-08,
-        help="Epsilon value for the optimizer",
+        help="Epsilon value for the Adam optimizer. If Adafactor optimizer is used, this param is ignored.",
     )
     parser.add_argument(
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
@@ -641,7 +641,9 @@ def main():
                                       scale_parameter=False, 
                                       relative_step=False, 
                                       warmup_init=False, 
-                                      lr=args.learning_rate)
+                                      lr=args.learning_rate,
+                                      weight_decay=rgs.weight_decay,
+            )
     else:
         if args.use_8bit_adam or args.use_adamw:
             optimizer = optimizer_cls(
@@ -656,7 +658,8 @@ def main():
                                       scale_parameter=False, 
                                       relative_step=False, 
                                       warmup_init=False, 
-                                      lr=args.learning_rate
+                                      lr=args.learning_rate,
+                                      weight_decay=rgs.weight_decay,
             )
 
     train_dataloader = get_dataloader(
