@@ -4,10 +4,10 @@ python train_text_to_image.py \
     --learning_rate 2e-5 \
     --train_batch_size 12 \
     --dataloader_num_workers 18 \
-    --num_train_epochs 3 \
+    --max_train_steps 700000 \
     --validation_steps 1000 \
     --use_cfg \
-    --output_dir sd-model-finetuned \
+    --output_dir diffusion_model \
     --push_to_hub \
     --lr_scheduler constant \
     --report_to wandb

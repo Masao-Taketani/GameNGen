@@ -690,8 +690,8 @@ def main():
         )
 
     if args.lr_scheduler == "constant":
-        num_warmup_steps_for_scheduler, num_training_steps_for_scheduler = None, None
-        
+        num_warmup_steps_for_scheduler, num_training_steps_for_scheduler, lr_warmup_steps = None, None, None
+
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,

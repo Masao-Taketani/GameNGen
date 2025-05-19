@@ -8,4 +8,5 @@ python train_text_to_image.py  \
     --dataloader_num_workers 18 \
     --max_train_samples 2 \
     --use_cfg \
-    --report_to wandb
+    --report_to wandb \
+    --output_dir diffusion_model
