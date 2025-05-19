@@ -7,4 +7,4 @@ accelerate launch --multi_gpu --mixed_precision=bf16 train_text_to_image.py \
    	--dataloader_num_workers 18 \
 	--use_cfg \
 	--output_dir sd-model-finetuned \
-    --lr_scheduler cosine
+    --lr_scheduler constant
