@@ -8,17 +8,20 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - Fixed the training steps to properly train the PPO agents within VizDoom environment
 
 ## To Do
-- [ ] Enable to collect VizDoom dataset with multiprocessing during RL policy training
+- [x] Set `MOVE_LEFT` and `MOVE_RIGHT` as independent actions
 - [x] Enable distributed training
 - [ ] Implement playable generative environments
-- [ ] Utilize SANA-Sprint architecture for diffusion training
 - [ ] Try using the original settings
   - **VizDoom**
-  - [ ] Add `MOVE_BACKWARD` action 
+  - [x] Add `MOVE_BACKWARD` action
+  - [x] Enable to collect VizDoom dataset with multiprocessing during RL policy training
   - **Diffusion Models**
-  - [ ] 2e-5 for the learning rate
-  - [ ] Adafactor optimizer
-  - [ ] A context length of 64
+  - [x] 2e-5 for the learning rate
+  - [x] Adafactor optimizer
+  - [x] A context length of 64
+  - [ ] Set action embedding as `trainable_params`
+  - [ ] Pad every image frame to get 320x256 from 320x240
+  - [ ] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
 
 ## Artifacts
 
