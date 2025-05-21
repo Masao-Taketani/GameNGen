@@ -19,6 +19,7 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
   - [x] 2e-5 for the learning rate
   - [x] Adafactor optimizer
   - [x] A context length of 64
+  - [x] Train iteratively with respect to steps, not epochs
   - [ ] Set action embedding as `trainable_params`
   - [ ] Pad every image frame to get 320x256 from 320x240
   - [ ] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
