@@ -3,8 +3,8 @@ python train_text_to_image.py  \
     --gradient_checkpointing  \
     --train_batch_size 12  \
     --learning_rate 2e-5  \
-    --num_train_epochs 1500  \
-    --validation_steps 250  \
+    --max_train_steps 20  \
+    --validation_steps 5  \
     --dataloader_num_workers 18 \
     --max_train_samples 2 \
     --use_cfg \
