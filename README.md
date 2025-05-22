@@ -19,7 +19,7 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
   - [x] 2e-5 for the learning rate
   - [x] Adafactor optimizer
   - [x] A context length of 64
-  - [x] Train iteratively with respect to steps, not epochs
+  - [x] Train iteratively with respect to steps, not epochs<br>
   ~~- [ ] Set action embedding as `trainable_params`~~
   - [ ] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters with multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668)
   - [ ] Pad every image frame to get 320x256 from 320x240
