@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 import textwrap
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
@@ -13,8 +14,24 @@ from safetensors.torch import save_file, load_file
 import json
 
 
+class CombinedTrainModel(nn.Module):
 
-def get_ft_vae_decoder() -> AutoencoderKL:
+    def __init__(self, unet: UNet2DConditionModel, action_embedding: nn.Embedding) -> None:
+        super().__init__()
+        self.unet = unet
+        self.action_embedding = action_embedding
+
+    def forward(self, input_ids, concatenated_latents, timesteps, discretized_noise_level):
+        encoder_hidden_states = self.action_embedding(input_ids)
+        return self.unet(concatenated_latents,
+                         timesteps,
+                         class_labels=discretized_noise_level,
+                         encoder_hidden_states=encoder_hidden_states,
+                         return_dict=False,
+                         )[0]
+
+
+def get_ft_vae_decoder(nn.Module) -> AutoencoderKL:
     """
     Based on the original GameNGen code, the vae decoder is finetuned on images from the
     training set to improve the quality of the images.
@@ -24,9 +41,8 @@ def get_ft_vae_decoder() -> AutoencoderKL:
 def get_model(
     action_embedding_dim: int, skip_image_conditioning: bool = False
 ) -> tuple[
-    UNet2DConditionModel,
+    CombinedTrainModel,
     AutoencoderKL,
-    torch.nn.Embedding,
     DDIMScheduler,
     CLIPTokenizer,
     CLIPTextModel,
@@ -38,10 +54,10 @@ def get_model(
     """
 
     # This will be used to encode the actions
-    action_embedding = torch.nn.Embedding(
+    action_embedding = nn.Embedding(
         num_embeddings=action_embedding_dim + 1, embedding_dim=768
     )
-    torch.nn.init.normal_(action_embedding.weight, mean=0.0, std=0.02)
+    nn.init.normal_(action_embedding.weight, mean=0.0, std=0.02)
 
     # DDIM scheduler allows for v-prediction and less sampling steps
     noise_scheduler = DDIMScheduler.from_pretrained(
@@ -58,7 +74,7 @@ def get_model(
     # There are 10 noise buckets total
     unet.register_to_config(num_class_embeds=NUM_BUCKETS)
     # We do not use .add_module() because the class_embedding is already initialized as None
-    unet.class_embedding = torch.nn.Embedding(
+    unet.class_embedding = nn.Embedding(
         NUM_BUCKETS, unet.time_embedding.linear_2.out_features
     )
 
@@ -72,21 +88,23 @@ def get_model(
     if not skip_image_conditioning:
         # This is to accomodate concatenating previous frames in the channels dimension
         new_in_channels = 4 * (BUFFER_SIZE + 1)
-        new_conv_in = torch.nn.Conv2d(
+        new_conv_in = nn.Conv2d(
             new_in_channels, 320, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)
         )
-        torch.nn.init.xavier_uniform_(new_conv_in.weight)
-        torch.nn.init.zeros_(new_conv_in.bias)
+        nn.init.xavier_uniform_(new_conv_in.weight)
+        nn.init.zeros_(new_conv_in.bias)
 
         # Replace the conv_in layer
         unet.conv_in = new_conv_in
         # Have to account for BUFFER SIZE conditioning frames + 1 for the noise
         unet.config["in_channels"] = new_in_channels
 
-    unet.requires_grad_(True)
+    comb_train_model = CombinedTrainModel(unet, action_embedding)
+
+    comb_train_model.requires_grad_(True)
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
-    return unet, vae, action_embedding, noise_scheduler, tokenizer, text_encoder
+    return comb_train_model, vae, noise_scheduler, tokenizer, text_encoder
 
 
 def load_embedding_info_dict(model_folder: str) -> dict:
@@ -104,8 +122,8 @@ def load_embedding_info_dict(model_folder: str) -> dict:
 
 def load_action_embedding(
     model_folder: str, action_num_embeddings: int
-) -> torch.nn.Embedding:
-    action_embedding = torch.nn.Embedding(
+) -> nn.Embedding:
+    action_embedding = nn.Embedding(
         num_embeddings=action_num_embeddings, embedding_dim=768
     )
     if os.path.exists(model_folder):
@@ -127,7 +145,7 @@ def load_model(
 ) -> tuple[
     UNet2DConditionModel,
     AutoencoderKL,
-    torch.nn.Embedding,
+    nn.Embedding,
     DDIMScheduler,
     CLIPTokenizer,
     CLIPTextModel,
@@ -180,7 +198,7 @@ def save_model(
     unet: UNet2DConditionModel,
     vae: AutoencoderKL,
     noise_scheduler: DDIMScheduler,
-    action_embedding: torch.nn.Embedding,
+    action_embedding: nn.Embedding,
 ) -> None:
     if isinstance(unet, DistributedDataParallel):
         unet.module.save_pretrained(os.path.join(output_dir, "unet"))
@@ -209,7 +227,7 @@ def save_and_maybe_upload_to_hub(
     unet: UNet2DConditionModel,
     vae: AutoencoderKL,
     noise_scheduler: DDIMScheduler,
-    action_embedding: torch.nn.Embedding,
+    action_embedding: nn.Embedding,
     should_upload_to_hub: bool = True,
     images: list = None,
     dataset_name: str = None,
