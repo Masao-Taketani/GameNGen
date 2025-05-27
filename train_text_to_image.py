@@ -236,11 +236,12 @@ def parse_args():
         default=1,
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
-    parser.add_argument(
-        "--gradient_checkpointing",
-        action="store_true",
-        help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
-    )
+    # Disable gradient_checkpointing
+    #parser.add_argument(
+    #    "--gradient_checkpointing",
+    #    action="store_true",
+    #    help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
+    #)
     parser.add_argument(
         "--learning_rate",
         type=float,
@@ -523,13 +524,13 @@ def main():
     dataset = EpisodeDataset(args.dataset_name)
     action_dim = dataset.get_action_dim()
 
-    unet, vae, action_embedding, noise_scheduler, tokenizer, text_encoder = get_model(
+    comb_train_model, vae, noise_scheduler, tokenizer, text_encoder = get_model(
         action_dim, skip_image_conditioning=args.skip_image_conditioning
     )
 
     if args.load_pretrained:
         logger.info(f"Loading pretrained model from {args.load_pretrained}")
-        unet.load_state_dict(
+        comb_train_model.unet.load_state_dict(
             load_file(
                 os.path.join(
                     args.load_pretrained, "unet", "diffusion_pytorch_model.safetensors"
@@ -552,7 +553,7 @@ def main():
             scheduler_config = json.load(f)
         noise_scheduler = DDIMScheduler.from_config(scheduler_config)
 
-        action_embedding.load_state_dict(
+        comb_train_model.action_embedding.load_state_dict(
             torch.load(os.path.join(args.load_pretrained, "action_embedding.pth"))
         )
 
@@ -560,10 +561,10 @@ def main():
         embedding_info = torch.load(
             os.path.join(args.load_pretrained, "embedding_info.pth")
         )
-        action_embedding.num_embeddings = embedding_info["num_embeddings"]
-        action_embedding.embedding_dim = embedding_info["embedding_dim"]
+        comb_train_model.action_embedding.num_embeddings = embedding_info["num_embeddings"]
+        comb_train_model.action_embedding.embedding_dim = embedding_info["embedding_dim"]
 
-    # For mixed precision training we cast all non-trainable weights (vae, non-lora text_encoder and non-lora unet) to half-precision
+    # For mixed precision training we cast all non-trainable weights (vae and non-lora text_encoder) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
@@ -571,15 +572,14 @@ def main():
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move unet, vae and text_encoder to device and cast to weight_dtype
-    unet.to(accelerator.device, dtype=weight_dtype)
+    # Move comb_train_model, vae and text_encoder to device and cast to weight_dtype
+    comb_train_model.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
-    action_embedding.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     if args.mixed_precision == "fp16":
-        # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params(unet, dtype=torch.float32)
+        # only upcast trainable parameters into fp32
+        cast_training_params(comb_train_model, dtype=torch.float32)
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -590,16 +590,16 @@ def main():
                 logger.warning(
                     "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
                 )
-            unet.enable_xformers_memory_efficient_attention()
+            comb_train_model.unet.enable_xformers_memory_efficient_attention()
         else:
             raise ValueError(
                 "xformers is not available. Make sure it is installed correctly"
             )
 
-    trainable_params = filter(lambda p: p.requires_grad, unet.parameters())
+    trainable_params = filter(lambda p: p.requires_grad, comb_train_model.parameters())
 
-    if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
+    #if args.gradient_checkpointing:
+    #    unet.enable_gradient_checkpointing()
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -628,33 +628,34 @@ def main():
         optimizer_cls = torch.optim.AdamW if args.use_adamw else torch.optim.Adafactor
 
     if args.skip_action_conditioning:
-        if args.use_8bit_adam or args.use_adamw:
-            optimizer = optimizer_cls(
-                unet.parameters(),
-                lr=args.learning_rate,
-                betas=(args.adam_beta1, args.adam_beta2),
-                weight_decay=args.weight_decay,
-                eps=args.adam_epsilon,
-            )
-        else:
-            optimizer = optimizer_cls(unet.parameters(),
-                                      scale_parameter=False, 
-                                      relative_step=False, 
-                                      warmup_init=False, 
-                                      lr=args.learning_rate,
-                                      weight_decay=rgs.weight_decay,
-            )
+        NotImplementedError("Currently not supported")
+        #if args.use_8bit_adam or args.use_adamw:
+        #    optimizer = optimizer_cls(
+        #        comb_train_model.unet.parameters(),
+        #        lr=args.learning_rate,
+        #        betas=(args.adam_beta1, args.adam_beta2),
+        #        weight_decay=args.weight_decay,
+        #        eps=args.adam_epsilon,
+        #    )
+        #else:
+        #    optimizer = optimizer_cls(comb_train_model.unet.parameters(),
+        #                              scale_parameter=False, 
+        #                              relative_step=False, 
+        #                              warmup_init=False, 
+        #                              lr=args.learning_rate,
+        #                              weight_decay=rgs.weight_decay,
+        #    )
     else:
         if args.use_8bit_adam or args.use_adamw:
             optimizer = optimizer_cls(
-                list(unet.parameters()) + list(action_embedding.parameters()),
+                comb_train_model.parameters(),
                 lr=args.learning_rate,
                 betas=(args.adam_beta1, args.adam_beta2),
                 weight_decay=args.weight_decay,
                 eps=args.adam_epsilon,
             )
         else:
-            optimizer = optimizer_cls(list(unet.parameters()) + list(action_embedding.parameters()),
+            optimizer = optimizer_cls(comb_train_model.parameters(),
                                       scale_parameter=False, 
                                       relative_step=False, 
                                       warmup_init=False, 
@@ -684,8 +685,8 @@ def main():
     )
 
     # Prepare everything with our `accelerator`.
-    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, lr_scheduler
+    comb_train_model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        comb_train_model, optimizer, train_dataloader, lr_scheduler
     )
 
     # We need to initialize the trackers we use, and also store our configuration.
@@ -766,10 +767,10 @@ def main():
 
     break_while = False
     while True:
-        unet.train()
+        comb_train_model.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(comb_train_model):
                 if args.skip_image_conditioning:
                     latents = vae.encode(
                         batch["pixel_values"].to(dtype=weight_dtype)
@@ -883,14 +884,18 @@ def main():
                     raise ValueError(
                         f"Unknown prediction type {noise_scheduler.config.prediction_type}"
                     )
+
                 # Predict the noise residual and compute loss
-                model_pred = unet(
-                    concatenated_latents,
-                    timesteps,
-                    class_labels=discretized_noise_level,
-                    encoder_hidden_states=encoder_hidden_states,
-                    return_dict=False,
-                )[0]
+                if args.skip_action_conditioning:
+                    model_pred = comb_train_model.unet(
+                        concatenated_latents,
+                        timesteps,
+                        class_labels=discretized_noise_level,
+                        encoder_hidden_states=encoder_hidden_states,
+                        return_dict=False,
+                    )[0]
+                else:
+                    model_pred = comb_train_model(batch["input_ids"], concatenated_latents, timesteps, discretized_noise_level)
 
                 if not args.skip_image_conditioning:
                     # Only predict the last frame – empirically verified that it is frame 0 and not frame -1.
@@ -936,7 +941,7 @@ def main():
                         step=global_step,
                     )
 
-                # Gather the losses across all pro`cesses for logging (if we use distributed training).
+                # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
 
@@ -972,10 +977,10 @@ def main():
                         save_and_maybe_upload_to_hub(
                             repo_id=REPO_NAME,
                             output_dir=args.output_dir,
-                            unet=unet,
+                            unet=accelerator.unwrap_model(comb_train_model).unet,
                             vae=vae,
                             noise_scheduler=noise_scheduler,
-                            action_embedding=action_embedding,
+                            action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
                             should_upload_to_hub=args.push_to_hub,
                             images=validation_images,
                             dataset_name=args.dataset_name,
@@ -992,11 +997,12 @@ def main():
                                 if args.skip_image_conditioning:
                                     raise NotImplementedError("Not supported anymore")
                                 else:
+                                    
                                     generated_image = run_inference_img_conditioning_with_params(
-                                        unet=accelerator.unwrap_model(unet),
+                                        unet=accelerator.unwrap_model(comb_train_model).unet,
                                         vae=vae,
                                         noise_scheduler=noise_scheduler,
-                                        action_embedding=action_embedding,
+                                        action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
                                         tokenizer=tokenizer,
                                         text_encoder=text_encoder,
                                         batch=single_sample_batch,
@@ -1059,10 +1065,10 @@ def main():
         save_and_maybe_upload_to_hub(
             repo_id=REPO_NAME,
             output_dir=args.output_dir,
-            unet=unet,
+            unet=accelerator.unwrap_model(comb_train_model).unet,
             vae=vae,
             noise_scheduler=noise_scheduler,
-            action_embedding=action_embedding,
+            action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
             should_upload_to_hub=args.push_to_hub,
             images=validation_images,
             dataset_name=args.dataset_name,
