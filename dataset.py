@@ -10,6 +10,7 @@ from data_augmentation import no_img_conditioning_augmentation
 IMG_TRANSFORMS = transforms.Compose(
         [
             transforms.Resize((HEIGHT, WIDTH), interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.Pad([0, 8, 0, 8]),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ]
