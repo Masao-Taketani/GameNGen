@@ -369,7 +369,7 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
             self.game.send_game_command(f"pukename change_difficulty {self.level}")
             self.last_rewards = deque(maxlen=self.rolling_mean_length)
             # Create a directory to save collected data for a new level
-            self.output_dir = os.path.join(self.out_base_dir, self.train_or_eval, f"{self.level}/{self.env_id}")
+            self.output_dir = os.path.join(self.out_base_dir, self.train_or_eval, f"level_{self.level}/{self.env_id}")
             os.makedirs(self.output_dir, exist_ok=True)
         else:
             print(f"{self.name} already at max level!")
