@@ -11,7 +11,7 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 - [x] Set `MOVE_LEFT` and `MOVE_RIGHT` as independent actions
 - [x] Enable distributed training
 - [ ] Implement playable generative environments
-- [ ] Try using the original settings
+- [x] Try using the original settings
   - **VizDoom**
   - [x] Add `MOVE_BACKWARD` action
   - [x] Enable to collect VizDoom dataset with multiprocessing during RL policy training
@@ -23,7 +23,7 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
   ~~- [ ] Set action embedding as `trainable_params`~~
   - [x] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters with multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668)
   - [x] Pad every image frame to get 320x256 from 320x240
-  - [ ] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
+  - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
 
 ## Artifacts
 

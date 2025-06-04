@@ -51,7 +51,7 @@ from config_sd import (
     VALIDATION_PROMPT,
     ZERO_OUT_ACTION_CONDITIONING_PROB,
 )
-from dataset import EpisodeDataset, get_dataloader
+from dataset import EpisodeDatasetMod, get_dataloader_mod
 from model import get_model, save_and_maybe_upload_to_hub
 from run_inference import run_inference_img_conditioning_with_params
 from utils import add_conditioning_noise, get_conditioning_noise
@@ -122,13 +122,19 @@ def parse_args():
         help="The name of the model to use as a base model.",
     )
     parser.add_argument(
-        "--dataset_name",
+        "--dataset_basepath",
         type=str,
         default=TRAINING_DATASET_DICT["small"],
         help=(
-            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-            " or to a folder containing files that 🤗 Datasets can understand."
+            "The Dataset base path pointing a folder containing files that 🤗 Datasets can understand to train on."
+        ),
+    )
+    parser.add_argument(
+        "--action_dim",
+        type=int,
+        default=19,
+        help=(
+            "The number of action dim the RL agent has trained with."
         ),
     )
     parser.add_argument(
@@ -144,7 +150,7 @@ def parse_args():
         help=(
             "A folder containing the training data. Folder contents must follow the structure described in"
             " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
+            " must exist to provide the captions for the images. Ignored if `dataset_basepath` is specified."
         ),
     )
     parser.add_argument(
@@ -454,7 +460,7 @@ def parse_args():
         args.local_rank = env_local_rank
 
     # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
+    if args.dataset_basepath is None and args.train_data_dir is None:
         raise ValueError("Need either a dataset name or a training folder.")
 
     return args
@@ -521,8 +527,8 @@ def main():
             ).repo_id
 
     # This is a bit wasteful
-    dataset = EpisodeDataset(args.dataset_name)
-    action_dim = dataset.get_action_dim()
+    dataset = EpisodeDatasetMod(args.dataset_basepath, args.action_dim)
+    action_dim = args.action_dim
 
     comb_train_model, vae, noise_scheduler, tokenizer, text_encoder = get_model(
         action_dim, skip_image_conditioning=args.skip_image_conditioning
@@ -663,8 +669,8 @@ def main():
                                       weight_decay=rgs.weight_decay,
             )
 
-    train_dataloader = get_dataloader(
-        dataset_name=args.dataset_name,
+    train_dataloader = get_dataloader_mod(
+        basepath=args.dataset_basepath,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
         shuffle=True,
@@ -702,7 +708,7 @@ def main():
     )
 
     logger.info("***** Running training *****")
-    logger.info(f"  Dataset = {args.dataset_name}")
+    logger.info(f"  Dataset base directory = {args.dataset_basepath}")
     logger.info(f"  Num examples = {len(dataset)}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(
@@ -983,7 +989,7 @@ def main():
                             action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
                             should_upload_to_hub=args.push_to_hub,
                             images=validation_images,
-                            dataset_name=args.dataset_name,
+                            dataset_basepath=args.dataset_basepath,
                         )
 
                         # Use the current batch for inference
@@ -1071,7 +1077,7 @@ def main():
             action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
             should_upload_to_hub=args.push_to_hub,
             images=validation_images,
-            dataset_name=args.dataset_name,
+            dataset_basepath=args.dataset_basepath,
         )
 
     accelerator.end_training()
