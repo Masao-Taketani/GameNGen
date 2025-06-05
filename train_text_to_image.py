@@ -132,7 +132,7 @@ def parse_args():
     parser.add_argument(
         "--action_dim",
         type=int,
-        default=19,
+        default=18,
         help=(
             "The number of action dim the RL agent has trained with."
         ),
@@ -305,7 +305,6 @@ def parse_args():
     )
     parser.add_argument(
         "--use_adamw",
-        type=str,
         action="store_true",
         help=(
             "Whether or not to use AdamW optimizer. If both 'use_8bit_adam' and 'use_adamw' are True, 8bit Adam is prioritized. "
@@ -662,15 +661,13 @@ def main():
             )
         else:
             optimizer = optimizer_cls(comb_train_model.parameters(),
-                                      scale_parameter=False, 
-                                      relative_step=False, 
-                                      warmup_init=False, 
                                       lr=args.learning_rate,
-                                      weight_decay=rgs.weight_decay,
+                                      weight_decay=args.weight_decay,
             )
 
     train_dataloader = get_dataloader_mod(
         basepath=args.dataset_basepath,
+        action_dim=action_dim,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
         shuffle=True,

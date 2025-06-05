@@ -31,7 +31,7 @@ class CombinedTrainModel(nn.Module):
                          )[0]
 
 
-def get_ft_vae_decoder(nn.Module) -> AutoencoderKL:
+def get_ft_vae_decoder() -> AutoencoderKL:
     """
     Based on the original GameNGen code, the vae decoder is finetuned on images from the
     training set to improve the quality of the images.
