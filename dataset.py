@@ -5,6 +5,7 @@ from torchvision import transforms
 from datasets import load_dataset, Dataset
 import random
 import os
+import logging
 
 from config_sd import HEIGHT, WIDTH, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
 from data_augmentation import no_img_conditioning_augmentation
@@ -22,6 +23,7 @@ IMG_TRANSFORMS = transforms.Compose(
 def collate_fn(examples):
     processed_images = []
     for example in examples:
+        #print("example:", example)
         # BUFFER_SIZE conditioning frames + 1 target frame
         processed_images.append(
             torch.stack(example["pixel_values"]))
@@ -88,13 +90,15 @@ class EpisodeDatasetMod:
             for img in dataset["frames"]
         ]
         actions = torch.tensor(dataset["actions"]) if isinstance(dataset["actions"], list) else dataset["actions"]
+        #print("images:", images)
+        #print("actions:", actions)
         # Since each data includes the buffer and label, the start has to be at least 1
         # and the last index has to be length - 1
         start_ep_idx = random.randint(1, length-1)
         if start_ep_idx < BUFFER_SIZE:
             padding = [IMG_TRANSFORMS(Image.new('RGB', (WIDTH, HEIGHT), color='black')) for _ in range(BUFFER_SIZE - start_ep_idx)]
-            return {'pixel_values': padding + images[:idx+1], 'input_ids': torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:idx+1]])}
-        return {'pixel_values': images[idx-BUFFER_SIZE:idx+1], 'input_ids': actions[idx-BUFFER_SIZE:idx+1]}
+            return {'pixel_values': padding + images[:start_ep_idx+1], 'input_ids': torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:start_ep_idx+1]])}
+        return {'pixel_values': images[start_ep_idx-BUFFER_SIZE:start_ep_idx+1], 'input_ids': actions[start_ep_idx-BUFFER_SIZE:start_ep_idx+1]}
 
 
 def get_dataloader(dataset_name: str, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
