@@ -54,9 +54,9 @@ cd ViZDoomPPO/
 pip install -r vizdoom_requirements.txt
 ```
 
-Then, run the following command to train an agent on vizdoom:
+Then, run the following command to train an agent and build the dataset on vizdoom at the same time.
 ```
-python train_ppo_parallel.py
+python train_ppo_and_collect_data_parallel.py --out_base_dir [dataset directory path]
 ```
 
 Once the agent is trained, generate episodes and upload them as a HF dataset using:

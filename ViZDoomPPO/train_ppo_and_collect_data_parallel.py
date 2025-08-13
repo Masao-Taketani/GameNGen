@@ -325,19 +325,21 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         # Create a directory to save collected data
         os.makedirs(self.output_dir, exist_ok=True)
         # Init lists to save data at the end of each episode
+        self.step_id = 0
         self.frames = []
         self.actions = []
-        self.step_ct = 0
+        self.step_ids = []
         self.current_action = None
 
     def step(self, action, array=False):
+        self.step_ids.append(self.step_id)
         # Repeat the same action for the specified times as ACTION_REPEAT 
-        if self.step_ct % ACTION_REPEAT == 0: self.current_action = action
+        if self.step_id % ACTION_REPEAT == 0: self.current_action = action
         if not self.game.is_episode_finished():
             self.frames.append(self.game.get_state().screen_buffer)
             self.actions.append(int(self.current_action.item()))
         state, reward, done, infos = super().step(self.current_action, array)
-        self.step_ct += 1
+        self.step_id += 1
         if done:
             self.save_episode_data()
             self.last_rewards.append(self.total_rew)
@@ -378,12 +380,14 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         episode_data = {
             'frames': [self.compress_image(frame) for frame in self.frames],
             'actions': self.actions,
+            'step_id': self.step_ids,
         }
         self.save_episodes_to_parquet(episode_data)
         # init variables to save for next espisode
+        self.step_id = 0
         self.frames = []
         self.actions = []
-        self.step_ct = 0
+        self.step_ids = []
         self.current_action = None
 
     def compress_image(self, image_array: np.ndarray, format='JPEG', quality=85):
@@ -397,7 +401,8 @@ class DoomWithBotsCurriculum(DoomWithBotsShaped):
         """Save batch with compressed binary images instead of base64"""
         processed_data = {
             'frames': [frame for frame in episode_data['frames']],
-            'actions': [int(a) for a in episode_data['actions']]
+            'actions': [int(a) for a in episode_data['actions']],
+            'step_ids': [int(s) for s in episode_data['step_id']]
         }
 
         df = pd.DataFrame.from_dict(processed_data)
