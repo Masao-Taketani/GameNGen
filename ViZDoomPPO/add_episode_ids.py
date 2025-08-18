@@ -36,14 +36,14 @@ if __name__ == "__main__":
         os.makedirs(os.path.join(new_ds_path, f"{subdirname}"), exist_ok=True)
             
         epi_id = 0
-        for dirpath, dirnames, filenames in tqdm(os.walk(orig_papth)):
-            for filename in filenames:
+        for dirpath, dirnames, filenames in tqdm(os.walk(orig_papth), desc=f"Outer Loop({subdirname})"):
+            for filename in tqdm(filenames, desc="Inner Loop", leave=False):
                 if filename.split(".")[-1] == "parquet":
                     fpath = os.path.join(dirpath, filename)
                     df = pd.read_parquet(fpath)
                     df["episode_id"] = epi_id
                     table = pa.Table.from_pandas(df)
-                    to_path = os.path.join(new_ds_path, f"{subdirname}", f"{epi_id}.parquet")
+                    to_path = os.path.join(new_ds_path, f"{subdirname}", f"episode_{epi_id}.parquet")
                     pq.write_table(table, to_path, compression='zstd')
                     epi_id += 1
 
