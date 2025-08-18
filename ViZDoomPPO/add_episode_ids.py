@@ -20,23 +20,21 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    base_path = args.orig_base_path
-    new_ds_path = args.new_base_path
-    train_path = os.path.join(base_path, "train")
-    eval_path = os.path.join(base_path, "eval")
+    base_path, new_ds_path = args.orig_base_path, args.new_base_path
+
+    def get_total_length(orig_papth):
+        total = 0
+        for dirpath, dirnames, filenames in tqdm(os.walk(orig_papth)): total += 1
+        return total
 
     def add_episode_ids_to_dataset(is_train_ds):
-        if is_train_ds:
-            orig_papth = train_path
-            subdirname = "train"
-        else:
-            orig_papth = eval_path
-            subdirname = "eval"
-            
+        subdirname = "train" if is_train_ds else "eval"
+        orig_papth = os.path.join(base_path, subdirname)
         os.makedirs(os.path.join(new_ds_path, f"{subdirname}"), exist_ok=True)
             
         epi_id = 0
-        for dirpath, dirnames, filenames in tqdm(os.walk(orig_papth), desc=f"Outer Loop({subdirname})"):
+        total = get_total_length(orig_papth)
+        for dirpath, dirnames, filenames in tqdm(os.walk(orig_papth), total=total, desc=f"Outer Loop({subdirname})"):
             for filename in tqdm(filenames, desc="Inner Loop", leave=False):
                 if filename.split(".")[-1] == "parquet":
                     fpath = os.path.join(dirpath, filename)
