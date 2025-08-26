@@ -870,7 +870,7 @@ def main():
                         batch["input_ids"], return_dict=False
                     )[0]
                 else:
-                    encoder_hidden_states = action_embedding(batch["input_ids"])
+                    encoder_hidden_states = comb_train_model.action_embedding(batch["input_ids"])
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -975,7 +975,7 @@ def main():
                 target_images = []
                 if global_step % args.validation_steps == 0:
                     accelerator.print("Generating validation image")
-                    unet.eval()
+                    comb_train_model.unet.eval()
                     if accelerator.is_main_process:
                         save_and_maybe_upload_to_hub(
                             repo_id=REPO_NAME,
@@ -986,7 +986,7 @@ def main():
                             action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
                             should_upload_to_hub=args.push_to_hub,
                             images=validation_images,
-                            dataset_basepath=args.dataset_basepath,
+                            dataset_name=args.dataset_basepath,
                         )
 
                         # Use the current batch for inference
@@ -1048,7 +1048,7 @@ def main():
                                 },
                                 step=global_step,
                             )
-                        unet.train()
+                        comb_train_model.unet.train()
 
             logs = {
                 "step_loss": loss.detach().item(),
@@ -1074,7 +1074,7 @@ def main():
             action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
             should_upload_to_hub=args.push_to_hub,
             images=validation_images,
-            dataset_basepath=args.dataset_basepath,
+            dataset_name=args.dataset_basepath,
         )
 
     accelerator.end_training()
