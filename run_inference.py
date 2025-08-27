@@ -16,6 +16,8 @@ from config_sd import (
     TRAINING_DATASET_DICT,
     WIDTH,
     DEFAULT_NUM_INFERENCE_STEPS,
+    H_PAD,
+    W_PAD,
 )
 from dataset import get_single_batch
 from model import load_model
@@ -23,8 +25,6 @@ from model import load_model
 torch.manual_seed(9052924)
 np.random.seed(9052924)
 random.seed(9052924)
-
-PAD = 16
 
 
 def encode_conditioning_frames(
@@ -95,8 +95,8 @@ def next_latent(
         latents = get_initial_noisy_latent(
             noise_scheduler,
             batch_size,
-            HEIGHT + PAD,
-            WIDTH,
+            HEIGHT + H_PAD,
+            WIDTH + W_PAD,
             num_channels_latents,
             vae_scale_factor,
             device,

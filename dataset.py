@@ -7,14 +7,14 @@ import random
 import os
 import logging
 
-from config_sd import HEIGHT, WIDTH, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
+from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
 from data_augmentation import no_img_conditioning_augmentation
 
 
 IMG_TRANSFORMS = transforms.Compose(
         [
             transforms.Resize((HEIGHT, WIDTH), interpolation=transforms.InterpolationMode.BILINEAR),
-            transforms.Pad([0, 8, 0, 8]),
+            transforms.Pad([W_PAD, H_PAD // 2, W_PAD, H_PAD // 2]),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ]
