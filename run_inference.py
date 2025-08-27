@@ -24,6 +24,8 @@ torch.manual_seed(9052924)
 np.random.seed(9052924)
 random.seed(9052924)
 
+PAD = 16
+
 
 def encode_conditioning_frames(
     vae: AutoencoderKL, images: torch.Tensor, vae_scale_factor: int, dtype: torch.dtype
@@ -93,7 +95,7 @@ def next_latent(
         latents = get_initial_noisy_latent(
             noise_scheduler,
             batch_size,
-            HEIGHT,
+            HEIGHT + PAD,
             WIDTH,
             num_channels_latents,
             vae_scale_factor,
