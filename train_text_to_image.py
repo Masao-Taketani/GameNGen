@@ -28,6 +28,7 @@ import diffusers
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.nn.parallel import DistributedDataParallel
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -870,7 +871,14 @@ def main():
                         batch["input_ids"], return_dict=False
                     )[0]
                 else:
-                    encoder_hidden_states = comb_train_model.action_embedding(batch["input_ids"])
+                    
+                    #if isinstance(unet, DistributedDataParallel):
+                    #    encoder_hidden_states = comb_train_model.module.action_embedding(batch["input_ids"])
+                    #else:
+                    #    encoder_hidden_states = comb_train_model.action_embedding(batch["input_ids"])
+
+                    method = comb_train_model.module.action_embedding if isinstance(comb_train_model, DistributedDataParallel) else comb_train_model.action_embedding
+                    encoder_hidden_states = method(batch["input_ids"])
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -890,7 +898,15 @@ def main():
 
                 # Predict the noise residual and compute loss
                 if args.skip_action_conditioning:
-                    model_pred = comb_train_model.unet(
+                    method = comb_train_model.module.unet if isinstance(comb_train_model, DistributedDataParallel) else comb_train_model.unet
+                    #model_pred = comb_train_model.unet(
+                    #    concatenated_latents,
+                    #    timesteps,
+                    #    class_labels=discretized_noise_level,
+                    #    encoder_hidden_states=encoder_hidden_states,
+                    #    return_dict=False,
+                    #)[0]
+                    model_pred = method(
                         concatenated_latents,
                         timesteps,
                         class_labels=discretized_noise_level,
@@ -975,7 +991,7 @@ def main():
                 target_images = []
                 if global_step % args.validation_steps == 0:
                     accelerator.print("Generating validation image")
-                    comb_train_model.unet.eval()
+                    comb_train_model.eval()
                     if accelerator.is_main_process:
                         save_and_maybe_upload_to_hub(
                             repo_id=REPO_NAME,
@@ -1048,7 +1064,7 @@ def main():
                                 },
                                 step=global_step,
                             )
-                        comb_train_model.unet.train()
+                        comb_train_model.train()
 
             logs = {
                 "step_loss": loss.detach().item(),
