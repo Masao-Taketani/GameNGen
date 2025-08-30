@@ -3,6 +3,7 @@ from PIL import Image
 import io
 from torchvision import transforms
 from datasets import load_dataset, Dataset
+from datasets.arrow_dataset import Column
 import random
 import os
 import logging
@@ -89,9 +90,8 @@ class EpisodeDatasetMod:
             IMG_TRANSFORMS(Image.open(io.BytesIO(img)).convert("RGB"))
             for img in dataset["frames"]
         ]
-        actions = torch.tensor(dataset["actions"]) if isinstance(dataset["actions"], list) else dataset["actions"]
-        #print("images:", images)
-        #print("actions:", actions)
+        actions = torch.tensor(dataset["actions"]) if isinstance(dataset["actions"], list) or isinstance(dataset["actions"], Column) else dataset["actions"]
+
         # Since each data includes the buffer and label, the start has to be at least 1
         # and the last index has to be length - 1
         start_ep_idx = random.randint(1, length-1)
