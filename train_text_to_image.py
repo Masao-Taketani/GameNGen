@@ -65,6 +65,9 @@ logger = get_logger(__name__, log_level="INFO")
 torch.set_float32_matmul_precision("high")
 
 
+def denormalize_image_or_video(x):
+    return ((0.5 * x + 0.5) * 255).numpy().astype('uint8')
+
 def log_validation(
     pipeline,
     args,
@@ -389,6 +392,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--wandb_name",
+        type=str,
+        default=None,
+        help=(
+            'Only used when `report_to` is set to `wandb`'
+        ),
+    )
+    parser.add_argument(
         "--local_rank",
         type=int,
         default=-1,
@@ -477,7 +488,7 @@ def main():
     if args.report_to == "wandb":
         import wandb
 
-        run = wandb.init()
+        run = wandb.init(project="GameNGen", name=args.wandb_name)
 
     logging_dir = Path(args.output_dir, args.logging_dir)
 
@@ -605,7 +616,9 @@ def main():
     trainable_params = filter(lambda p: p.requires_grad, comb_train_model.parameters())
 
     #if args.gradient_checkpointing:
-    #    unet.enable_gradient_checkpointing()
+    #    #unet.enable_gradient_checkpointing()
+    #    comb_train_model.enable_gradient_checkpointing()
+        
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -987,7 +1000,8 @@ def main():
                 train_loss = 0.0
 
                 validation_images = []
-                context_images = []  # To store context images
+                #context_images = []  # To store context images
+                context_videos = []
                 target_images = []
                 if global_step % args.validation_steps == 0:
                     accelerator.print("Generating validation image")
@@ -1034,7 +1048,10 @@ def main():
                                 validation_images.append(generated_image)
 
                                 # Extract and store context images
-                                context_images.append(
+                                #context_images.append(
+                                #    single_sample_batch["pixel_values"][0][:BUFFER_SIZE]
+                                #)
+                                context_videos.append(
                                     single_sample_batch["pixel_values"][0][:BUFFER_SIZE]
                                 )
                                 target_images.append(
@@ -1051,15 +1068,15 @@ def main():
                                     ],
                                     "2_target_images": [
                                         wandb.Image(
-                                            target_img, caption=f"Target Image {i}"
+                                            denormalize_image_or_video(target_img.cpu()), caption=f"Target Image {i}"
                                         )
                                         for i, target_img in enumerate(target_images)
                                     ],
                                     "3_context_images": [
-                                        wandb.Image(
-                                            context_img, caption=f"Context Image {i}"
+                                        wandb.Video(
+                                            denormalize_image_or_video(context_video.cpu()), caption=f"Context Image {i}", fps=4, format="gif"
                                         )
-                                        for i, context_img in enumerate(context_images)
+                                        for i, context_video in enumerate(context_videos)
                                     ],
                                 },
                                 step=global_step,

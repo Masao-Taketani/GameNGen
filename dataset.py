@@ -38,7 +38,8 @@ def collate_fn(examples):
     images = no_img_conditioning_augmentation(images, prob=ZERO_OUT_ACTION_CONDITIONING_PROB)
     return {
         "pixel_values": images,
-        "input_ids": torch.stack([torch.tensor(example["input_ids"][:BUFFER_SIZE+1]).clone().detach() for example in examples]),
+        #"input_ids": torch.stack([torch.tensor(example["input_ids"][:BUFFER_SIZE+1]).clone().detach() for example in examples]),
+        "input_ids": torch.stack([example["input_ids"][:BUFFER_SIZE+1] for example in examples]),
     }
 
 
