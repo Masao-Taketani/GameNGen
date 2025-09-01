@@ -66,7 +66,11 @@ torch.set_float32_matmul_precision("high")
 
 
 def denormalize_image_or_video(x):
-    return ((0.5 * x + 0.5) * 255).numpy().astype('uint8')
+    x = ((0.5 * x + 0.5) * 255)
+    if x.dim() == 3:
+        return x.permute(1, 2, 0).numpy().astype('uint8')
+    else:
+        return x.numpy().astype('uint8')
 
 def log_validation(
     pipeline,
@@ -1052,7 +1056,9 @@ def main():
                                 #    single_sample_batch["pixel_values"][0][:BUFFER_SIZE]
                                 #)
                                 context_videos.append(
-                                    single_sample_batch["pixel_values"][0][:BUFFER_SIZE]
+                                    #single_sample_batch["pixel_values"][0][:BUFFER_SIZE]
+                                    # Use only last 5 frames of input images to carefully check the meaningful context
+                                    single_sample_batch["pixel_values"][0][-6:-1]
                                 )
                                 target_images.append(
                                     single_sample_batch["pixel_values"][0][-1]
@@ -1074,7 +1080,8 @@ def main():
                                     ],
                                     "3_context_images": [
                                         wandb.Video(
-                                            denormalize_image_or_video(context_video.cpu()), caption=f"Context Image {i}", fps=4, format="gif"
+                                            # Use fps=1 to carefully check the relation between the context and the target
+                                            denormalize_image_or_video(context_video.cpu()), caption=f"Context Image {i}", fps=1, format="gif"
                                         )
                                         for i, context_video in enumerate(context_videos)
                                     ],
