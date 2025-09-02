@@ -51,6 +51,11 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
 
         for batch in progress_bar:
             data = batch["pixel_values"].to(model.device)
+            """
+            The following part is not sampled as for the encoder output according to the link below.
+            https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
+            Don't know why. May change it later.
+            """
             reconstruction = model(data).sample
             loss = F.mse_loss(reconstruction, data, reduction="mean")
             test_loss += loss.item()
@@ -121,6 +126,11 @@ def main():
             data = batch["pixel_values"].to(device)
             optimizer.zero_grad()
 
+            """
+            The following part is not sampled as for the encoder output according to the link below.
+            https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
+            Don't know why. May change it later.
+            """
             reconstruction = model(data).sample
             loss = F.mse_loss(reconstruction, data, reduction="mean")
 
