@@ -409,30 +409,30 @@ def parse_args():
         default=-1,
         help="For distributed training: local_rank",
     )
-    parser.add_argument(
-        "--checkpointing_steps",
-        type=int,
-        default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
-    )
+    #parser.add_argument(
+    #    "--checkpointing_steps",
+    #    type=int,
+    #    default=500,
+    #    help=(
+    #        "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
+    #        " training using `--resume_from_checkpoint`."
+    #    ),
+    #)
     parser.add_argument(
         "--checkpoints_total_limit",
         type=int,
         default=None,
         help=("Max number of checkpoints to store."),
     )
-    parser.add_argument(
-        "--resume_from_checkpoint",
-        type=str,
-        default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
-    )
+    #parser.add_argument(
+    #    "--resume_from_checkpoint",
+    #    type=str,
+    #    default=None,
+    #    help=(
+    #        "Whether training should be resumed from a previous checkpoint. Use a path saved by"
+    #        ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
+    #    ),
+    #)
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention",
         action="store_true",
@@ -467,6 +467,14 @@ def parse_args():
         type=str,
         default=None,
         help="Path to a directory containing a previously trained model to load.",
+    )
+    parser.add_argument(
+        "--resuming_step",
+        type=int,
+        default=0,
+        help=(
+            "Specify your resuming step. Only applicable if `load_pretrained` is set."
+        ),
     )
 
     args = parser.parse_args()
@@ -763,34 +771,36 @@ def main():
     global_step = 0
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
-            dirs = [d for d in dirs if d.startswith("checkpoint")]
-            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
+    #if args.resume_from_checkpoint:
+    #    if args.resume_from_checkpoint != "latest":
+    #        path = os.path.basename(args.resume_from_checkpoint)
+    #    else:
+    #        # Get the most recent checkpoint
+    #        dirs = os.listdir(args.output_dir)
+    #        dirs = [d for d in dirs if d.startswith("checkpoint")]
+    #        dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+    #        path = dirs[-1] if len(dirs) > 0 else None
+    #
+    #    if path is None:
+    #        accelerator.print(
+    #            f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
+    #        )
+    #        args.resume_from_checkpoint = None
+    #        initial_global_step = 0
+    #    else:
+    #        accelerator.print(f"Resuming from checkpoint {path}")
+    #        accelerator.load_state(os.path.join(args.output_dir, path))
+    #        global_step = int(path.split("-")[1])
+    #
+    #        initial_global_step = global_step
+    #else:
+    #    initial_global_step = 0
 
-        if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
-            args.resume_from_checkpoint = None
-            initial_global_step = 0
-        else:
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
-            global_step = int(path.split("-")[1])
-
-            initial_global_step = global_step
-    else:
-        initial_global_step = 0
-
+    initial_global_step = args.resuming_step if args.load_pretrained else 0
     progress_bar = tqdm(
-        range(0, args.max_train_steps),
+        range(initial_global_step, args.max_train_steps),
         initial=initial_global_step,
+        total=args.max_train_steps,
         desc="Steps",
         # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
