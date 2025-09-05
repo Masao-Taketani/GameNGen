@@ -550,7 +550,7 @@ def main():
     )
 
     if args.load_pretrained:
-        logger.info(f"Loading pretrained model from {args.load_pretrained}")
+        logger.info(f"0/5 Loading pretrained model from {args.load_pretrained}")
         comb_train_model.unet.load_state_dict(
             load_file(
                 os.path.join(
@@ -558,6 +558,8 @@ def main():
                 )
             )
         )
+        logger.info(f"1/5 Successfully loaded unet")
+
         vae.load_state_dict(
             load_file(
                 os.path.join(
@@ -565,25 +567,33 @@ def main():
                 )
             )
         )
+        logger.info(f"2/5 Successfully loaded vae")
 
         # Load scheduler configuration
         with open(
-            os.path.join(args.load_pretrained, "scheduler", "scheduler_config.json"),
+            os.path.join(args.load_pretrained, "noise_scheduler", "scheduler_config.json"),
             "r",
         ) as f:
             scheduler_config = json.load(f)
         noise_scheduler = DDIMScheduler.from_config(scheduler_config)
+        logger.info(f"3/5 Successfully loaded noise_scheduler")
 
         comb_train_model.action_embedding.load_state_dict(
-            torch.load(os.path.join(args.load_pretrained, "action_embedding.pth"))
+            load_file(
+                os.path.join(
+                    args.load_pretrained, "action_embedding_model.safetensors"
+                )
+            )
         )
+        logger.info(f"4/5 Successfully loaded action_embedding")
 
         # Load embedding info
-        embedding_info = torch.load(
-            os.path.join(args.load_pretrained, "embedding_info.pth")
-        )
+        with open(os.path.join(args.load_pretrained, "embedding_info.json"), 'r') as f:
+            embedding_info = json.load(f)
         comb_train_model.action_embedding.num_embeddings = embedding_info["num_embeddings"]
         comb_train_model.action_embedding.embedding_dim = embedding_info["embedding_dim"]
+        logger.info(f"5/5 Successfully loaded embedding_info")
+        logger.info(f"Loading models and configs is complete. About to resume training")
 
     # For mixed precision training we cast all non-trainable weights (vae and non-lora text_encoder) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
