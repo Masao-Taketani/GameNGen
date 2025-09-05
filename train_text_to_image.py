@@ -1024,8 +1024,9 @@ def main():
                         )
 
                         # Use the current batch for inference
-                        # Generate 2 images
-                        for i in range(2):
+                        # Generate 2 images. If `args.train_batch_size` is less than 2, set eval iter as `args.train_batch_size`.
+                        eval_iter = 2 if 2 <= args.train_batch_size else args.train_batch_size
+                        for i in range(eval_iter):
                             single_sample_batch = {
                                 "pixel_values": batch["pixel_values"][i].unsqueeze(0),
                                 "input_ids": batch["input_ids"][i].unsqueeze(0),

@@ -108,7 +108,7 @@ def get_dataloader(dataset_name: str, batch_size: int = 1, num_workers: int = 1,
 
 def get_dataloader_mod(basepath: str, action_dim: int, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
     dataset = EpisodeDatasetMod(basepath, action_dim)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, num_workers=num_workers, persistent_workers=True)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, num_workers=num_workers, persistent_workers=True, drop_last=True)
 
 def get_single_batch(dataset_name: str) -> dict[str, torch.Tensor]:
     dataloader = get_dataloader(dataset_name, batch_size=1, num_workers=1, shuffle=False)
