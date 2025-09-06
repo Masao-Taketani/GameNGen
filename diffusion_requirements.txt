@@ -11,7 +11,7 @@ accelerate
 diffusers
 datasets
 peft
-wandb
+wandb[media]
 pydantic
 ruff
 safetensors
