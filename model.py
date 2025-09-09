@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 import textwrap
+from diffusers import ModelMixin
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from transformers import CLIPTokenizer, CLIPTextModel
 from huggingface_hub import hf_hub_download
@@ -14,7 +15,9 @@ from safetensors.torch import save_file, load_file
 import json
 
 
-class CombinedTrainModel(nn.Module):
+class CombinedTrainModel(ModelMixin):
+
+    _supports_gradient_checkpointing = True
 
     def __init__(self, unet: UNet2DConditionModel, action_embedding: nn.Embedding) -> None:
         super().__init__()
@@ -22,6 +25,10 @@ class CombinedTrainModel(nn.Module):
         self.action_embedding = action_embedding
 
     def forward(self, input_ids, concatenated_latents, timesteps, discretized_noise_level):
+        #if self.training and getattr(self, "is_gradient_checkpointing", False):
+        #    encoder_hidden_states = torch.utils.checkpoint.checkpoint(self.action_embedding, input_ids)
+        #else:
+        #    encoder_hidden_states = self.action_embedding(input_ids)
         encoder_hidden_states = self.action_embedding(input_ids)
         return self.unet(concatenated_latents,
                          timesteps,
@@ -31,12 +38,13 @@ class CombinedTrainModel(nn.Module):
                          )[0]
 
 
-def get_ft_vae_decoder() -> AutoencoderKL:
+def get_ft_vae_decoder(use_orig_vae=True) -> AutoencoderKL:
     """
     Based on the original GameNGen code, the vae decoder is finetuned on images from the
     training set to improve the quality of the images.
     """ 
-    return AutoencoderKL.from_pretrained("arnaudstiegler/game-n-gen-vae-finetuned")
+    model_name = PRETRAINED_MODEL_NAME_OR_PATH if use_orig_vae else "arnaudstiegler/game-n-gen-vae-finetuned"
+    return AutoencoderKL.from_pretrained(model_name)
 
 def get_model(
     action_embedding_dim: int, skip_image_conditioning: bool = False
