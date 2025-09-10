@@ -551,7 +551,6 @@ def main():
             ).repo_id
 
     # This is a bit wasteful
-    dataset = EpisodeDatasetMod(args.dataset_basepath, args.action_dim)
     action_dim = args.action_dim
 
     comb_train_model, vae, noise_scheduler, tokenizer, text_encoder = get_model(

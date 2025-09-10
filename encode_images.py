@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 
 from model import get_ft_vae_decoder
 
@@ -18,8 +19,11 @@ def main():
     args = parse_args()
 
     for imgs in dataloader:
+        kv = {}
         vae = get_ft_vae_decoder()
         vae.requires_grad_(False)
         parameters = vae.encode(
             imgs.to(dtype=weight_dtype)
         ).latent_dist.parameters
+        parameters = parameters.cpu().data.numpy()
+        np.savez(cur_fname, kv)
