@@ -3,20 +3,34 @@ import numpy as np
 import os
 
 from model import get_ft_vae_decoder
+from dataset import get_dataloader_prep
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Script to encode images into latents for efficient training.")
     parser.add_argument(
-        "--data_dir_path",
+        "--dataset_basepath",
         type=str,
         help="Path to a directory containing parquet files which are collected while training the PPO policy.",
+    )
+    parser.add_argument(
+        "--save_dir_path",
+        type=str,
+        help="Path to a directory to save latent images.",
+    )
+    parser.add_argument(
+        "--dataloader_num_workers",
+        type=int,
+        default=16,
+        help=(
+            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
+        ),
     )
     parser.add_argument(
         "--batch_size",
         type=int,
         default=744,
-        help="Batch size used for each image encoding.",
+        help="Batch size used for image encoding within each episode data.",
     )
     parser.add_argument(
         "--chunk_size",
@@ -42,9 +56,9 @@ def parse_args():
     return args
 
 
-def save_data_as_npz(dpath, epi_id, kv):
-    path = os.path.join(dpath, f"episode_{epi_id}.npz")
-    np.savez(path, kv)
+def save_data_as_npz(dpath, epi_id, parameters, actions):
+    path = os.path.join(dpath, f"latent_episode_{epi_id}.npz")
+    np.savez(path, parameters=parameters, actions=actions)
 
 def main():
     args = parse_args()
@@ -60,16 +74,20 @@ def main():
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
+    dataloader = get_dataloader_prep(
+        basepath=args.dataset_basepath,
+        num_workers=args.dataloader_num_workers,
+    )
+
     vae = get_ft_vae_decoder()
     vae.to(device, dtype=weight_dtype)
 
-    for epi_id, (imgs, acts) in tqdm(enumerate(loader)):
+    for epi_id, (imgs, acts) in tqdm(enumerate(dataloader)):
         imgs = imgs.squeeze(dim=0)
-        kv = {}
         params = []
         for i in range(0, len(imgs), args.batch_size):
             bs_imgs = imgs[i:i+args.batch_size].to(device, dtype=weight_dtype)
             with torch.inference_mode():
                 parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data.numpy()
                 params.append(params)
-        kv["parameters"] = np.concatena
+        save_data_as_npz(args.save_dir_path, epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())

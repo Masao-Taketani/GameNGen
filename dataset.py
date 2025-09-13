@@ -72,6 +72,28 @@ class EpisodeDataset:
         return self.action_dim
 
 
+class EpisodeDatasetPrep:
+    def __init__(self, basepath: str):
+        self.samples = []
+        for dirpath, dirnames, filenames in os.walk(basepath):
+            for filename in filenames:
+                if filename.split(".")[-1] == "parquet": self.samples.append(os.path.join(dirpath, filename))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        path = self.samples[idx]
+        dataset = Dataset.from_parquet(path)
+        length = len(dataset)
+        images = [
+            IMG_TRANSFORMS(Image.open(io.BytesIO(img)).convert("RGB"))
+            for img in dataset["frames"]
+        ]
+        actions = torch.tensor(dataset["actions"]) if isinstance(dataset["actions"], list) or isinstance(dataset["actions"], Column) else dataset["actions"]
+        return torch.stack(images), actions
+
+
 class EpisodeDatasetMod:
     def __init__(self, basepath: str, action_dim: int):
         self.action_dim = action_dim
@@ -105,6 +127,11 @@ class EpisodeDatasetMod:
 def get_dataloader(dataset_name: str, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
     dataset = EpisodeDataset(dataset_name)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, num_workers=num_workers)
+
+def get_dataloader_prep(basepath: str, num_workers: int = 1) -> torch.utils.data.DataLoader:
+    dataset = EpisodeDatasetPrep(basepath)
+    # batch_size 1 indicates the loader returns one episode data each time
+    return torch.utils.data.DataLoader(dataset, batch_size=1, sampler=torch.utils.data.SequentialSampler(dataset), num_workers=num_workers, drop_last=False)
 
 def get_dataloader_mod(basepath: str, action_dim: int, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
     dataset = EpisodeDatasetMod(basepath, action_dim)

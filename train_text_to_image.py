@@ -53,7 +53,7 @@ from config_sd import (
     VALIDATION_PROMPT,
     ZERO_OUT_ACTION_CONDITIONING_PROB,
 )
-from dataset import EpisodeDatasetMod, get_dataloader_mod
+from dataset import get_dataloader_mod
 from model import get_model, save_and_maybe_upload_to_hub
 from run_inference import run_inference_img_conditioning_with_params
 from utils import add_conditioning_noise, get_conditioning_noise
