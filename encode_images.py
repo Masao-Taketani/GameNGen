@@ -1,6 +1,8 @@
 import argparse
 import numpy as np
 import os
+from tqdm import tqdm
+import torch
 
 from model import get_ft_vae_decoder
 from dataset import get_dataloader_prep
@@ -49,15 +51,19 @@ def parse_args():
         "--chunk_id",
         type=int,
         default=None,
-        help="Chunk ID used for parallel GPU processing by deviding the whole episode dataset into chunks, ",
-             "and process each chunk independently specifying the ID."
+        help=(
+            "Chunk ID used for parallel GPU processing by deviding the whole episode dataset into chunks, "
+            "and process each chunk independently specifying the ID.",
+        ),
     )
     parser.add_argument(
         "--gpu_id",
         type=str,
         default=None,
-        help="If multiple GPUs are available and you need to specify GPU id for parallel chunk processes, ",
-             "use this argumment. If None and GPU(s) is/are avaiable, The first index is used."
+        help=(
+            "If multiple GPUs are available and you need to specify GPU id for parallel chunk processes, "
+            "use this argumment. If None and GPU(s) is/are avaiable, The first index is used."
+        ),
     )
 
     args = parser.parse_args()
@@ -77,19 +83,18 @@ def main():
     device = torch.device(device_name)
 
     weight_dtype = torch.float32
-    if accelerator.mixed_precision == "fp16":
+    if args.dtype == "fp16":
         weight_dtype = torch.float16
-    elif accelerator.mixed_precision == "bf16":
+    elif args.dtype == "bf16":
         weight_dtype = torch.bfloat16
 
     dataloader = get_dataloader_prep(
         basepath=args.dataset_basepath,
         num_chunk=args.num_chunks,
-        chunk_id=args.chunk_id
+        chunk_id=args.chunk_id,
         num_workers=args.dataloader_num_workers,
     )
     start_epi_id = dataloader.dataset.epi_id
-
     vae = get_ft_vae_decoder()
     vae.to(device, dtype=weight_dtype)
 
@@ -100,5 +105,9 @@ def main():
             bs_imgs = imgs[i:i+args.batch_size].to(device, dtype=weight_dtype)
             with torch.inference_mode():
                 parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data.numpy()
-                params.append(params)
+                params.append(parameters)
         save_data_as_npz(args.save_dir_path, start_epi_id+epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())
+
+
+if __name__ == "__main__":
+    main()
