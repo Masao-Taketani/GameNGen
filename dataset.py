@@ -7,6 +7,7 @@ from datasets.arrow_dataset import Column
 import random
 import os
 import logging
+import math
 
 from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
 from data_augmentation import no_img_conditioning_augmentation
@@ -73,11 +74,16 @@ class EpisodeDataset:
 
 
 class EpisodeDatasetPrep:
-    def __init__(self, basepath: str):
+    def __init__(self, basepath: str, num_chunk: int = None, chunk_id: int = None):
         self.samples = []
+        self.epi_id = 0
         for dirpath, dirnames, filenames in os.walk(basepath):
             for filename in filenames:
                 if filename.split(".")[-1] == "parquet": self.samples.append(os.path.join(dirpath, filename))
+        if num_chunk is not None and chunk_id is not None:
+            chunk_size = math.ceil(len(self.samples) / num_chunk)
+            self.samples = self.samples[chunk_id*chunk_size:(chunk_id+1)*chunk_size]
+            self.epi_id = chunk_id * chunk_size
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -128,8 +134,8 @@ def get_dataloader(dataset_name: str, batch_size: int = 1, num_workers: int = 1,
     dataset = EpisodeDataset(dataset_name)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, num_workers=num_workers)
 
-def get_dataloader_prep(basepath: str, num_workers: int = 1) -> torch.utils.data.DataLoader:
-    dataset = EpisodeDatasetPrep(basepath)
+def get_dataloader_prep(basepath: str, num_chunk: int = None, chunk_id: int = None, num_workers: int = 1) -> torch.utils.data.DataLoader:
+    dataset = EpisodeDatasetPrep(basepath, num_chunk, chunk_id)
     # batch_size 1 indicates the loader returns one episode data each time
     return torch.utils.data.DataLoader(dataset, batch_size=1, sampler=torch.utils.data.SequentialSampler(dataset), num_workers=num_workers, drop_last=False)
 

@@ -33,10 +33,24 @@ def parse_args():
         help="Batch size used for image encoding within each episode data.",
     )
     parser.add_argument(
-        "--chunk_size",
+        "--dtype",
+        type=str,
+        default="bf16",
+        help="Dtype used for VAE and batch data.",
+    )
+    # Ignore the following arguments if you are not using multiple GPUs to process.
+    parser.add_argument(
+        "--num_chunks",
         type=int,
         default=None,
-        help="Chunk size used for parallel GPU processing by deviding the whole episode dataset into chunks.",
+        help="The number of data for each chunk used for parallel GPU processing by deviding the whole episode dataset into chunks.",
+    )
+    parser.add_argument(
+        "--chunk_id",
+        type=int,
+        default=None,
+        help="Chunk ID used for parallel GPU processing by deviding the whole episode dataset into chunks, ",
+             "and process each chunk independently specifying the ID."
     )
     parser.add_argument(
         "--gpu_id",
@@ -44,12 +58,6 @@ def parse_args():
         default=None,
         help="If multiple GPUs are available and you need to specify GPU id for parallel chunk processes, ",
              "use this argumment. If None and GPU(s) is/are avaiable, The first index is used."
-    )
-    parser.add_argument(
-        "--dtype",
-        type=str,
-        default="bf16",
-        help="Dtype used for VAE and batch data.",
     )
 
     args = parser.parse_args()
@@ -76,13 +84,16 @@ def main():
 
     dataloader = get_dataloader_prep(
         basepath=args.dataset_basepath,
+        num_chunk=args.num_chunks,
+        chunk_id=args.chunk_id
         num_workers=args.dataloader_num_workers,
     )
+    start_epi_id = dataloader.dataset.epi_id
 
     vae = get_ft_vae_decoder()
     vae.to(device, dtype=weight_dtype)
 
-    for epi_id, (imgs, acts) in tqdm(enumerate(dataloader)):
+    for epi_id, (imgs, acts) in tqdm(enumerate(dataloader), total=len(dataloader)):
         imgs = imgs.squeeze(dim=0)
         params = []
         for i in range(0, len(imgs), args.batch_size):
@@ -90,4 +101,4 @@ def main():
             with torch.inference_mode():
                 parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data.numpy()
                 params.append(params)
-        save_data_as_npz(args.save_dir_path, epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())
+        save_data_as_npz(args.save_dir_path, start_epi_id+epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())

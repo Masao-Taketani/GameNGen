@@ -43,8 +43,13 @@ def get_ft_vae_decoder(use_orig_vae=True) -> AutoencoderKL:
     Based on the original GameNGen code, the vae decoder is finetuned on images from the
     training set to improve the quality of the images.
     """ 
-    model_name = PRETRAINED_MODEL_NAME_OR_PATH if use_orig_vae else "arnaudstiegler/game-n-gen-vae-finetuned"
-    return AutoencoderKL.from_pretrained(model_name)
+    
+    if use_orig_vae:
+        return AutoencoderKL.from_pretrained(
+                    PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae"
+                )
+    else:
+        return AutoencoderKL.from_pretrained("arnaudstiegler/game-n-gen-vae-finetuned")
 
 def get_model(
     action_embedding_dim: int, skip_image_conditioning: bool = False
