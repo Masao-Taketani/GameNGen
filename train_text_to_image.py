@@ -37,7 +37,6 @@ from diffusers import DDIMScheduler
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import cast_training_params, compute_snr
 from diffusers.utils.import_utils import is_xformers_available
-from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
 from huggingface_hub import create_repo
 from packaging import version
 from safetensors.torch import load_file
