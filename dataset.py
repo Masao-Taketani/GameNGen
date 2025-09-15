@@ -124,7 +124,8 @@ class EpisodeDatasetLatent:
         pred_idx = random.randint(0, length-1)
         if pred_idx < BUFFER_SIZE:
             padding = torch.zeros([BUFFER_SIZE - pred_idx, parameters.shape[1]//2, *parameters.shape[2:]])
-            latents = torch.concat([padding, parameters[:pred_idx+1]])
+            latents = DiagonalGaussianDistribution(parameters[:pred_idx+1]).sample()
+            latents = torch.concat([padding, latents])
             actions = torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:pred_idx+1]])
             return {'latent_values': latents, 'input_ids': actions}
         parameters, actions = parameters[pred_idx-BUFFER_SIZE:pred_idx+1], actions[pred_idx-BUFFER_SIZE:pred_idx+1]
