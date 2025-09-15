@@ -48,6 +48,23 @@ def encode_conditioning_frames(
     return conditioning_frame_latents
 
 
+def prepare_conditioning_frames(
+    latents: torch.Tensor, device: torch.device, dtype: torch.dtype
+) -> torch.Tensor:
+    batch_size, _, channels, height, width = latents.shape
+    conditioning_frame_latents = latents.to(device=device, dtype=dtype) * vae.config.scaling_factor
+
+    # Reshape context latents
+    conditioning_frame_latents = conditioning_frame_latents.reshape(
+        batch_size,
+        BUFFER_SIZE,
+        vae.config.latent_channels,
+        height,
+        width,
+    )
+    return conditioning_frame_latents
+
+
 def get_initial_noisy_latent(
     noise_scheduler: DDPMScheduler,
     batch_size: int,
@@ -219,6 +236,52 @@ def run_inference_img_conditioning_with_params(
             vae,
             images=batch["pixel_values"],
             vae_scale_factor=vae_scale_factor,
+            dtype=torch.float32,
+        )
+        new_frame = next_latent(
+            unet=unet,
+            vae=vae,
+            noise_scheduler=noise_scheduler,
+            action_embedding=action_embedding,
+            context_latents=conditioning_frames_latents,
+            device=device,
+            actions=actions,
+            skip_action_conditioning=skip_action_conditioning,
+            num_inference_steps=num_inference_steps,
+            do_classifier_free_guidance=do_classifier_free_guidance,
+            guidance_scale=guidance_scale,
+        )
+
+        # only take the last frame
+        image = decode_and_postprocess(
+            vae=vae, image_processor=image_processor, latents=new_frame
+        )
+    return image
+
+
+def run_inference_latent_conditioning_with_params(
+    unet,
+    vae,
+    noise_scheduler,
+    action_embedding,
+    tokenizer,
+    text_encoder,
+    batch,
+    device,
+    num_inference_steps=DEFAULT_NUM_INFERENCE_STEPS,
+    do_classifier_free_guidance=True,
+    guidance_scale=CFG_GUIDANCE_SCALE,
+    skip_action_conditioning=False,
+) -> Image:
+    assert batch["latent_values"].shape[0] == 1, "Batch size must be 1"
+    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+    with torch.no_grad(), autocast(device_type="cuda", dtype=torch.float32):
+        actions = batch["input_ids"]
+
+        conditioning_frames_latents = prepare_conditioning_frames(
+            latents=batch["latent_values"],
+            device=unet.device,
             dtype=torch.float32,
         )
         new_frame = next_latent(
