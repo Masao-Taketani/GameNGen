@@ -68,18 +68,17 @@ def prepare_conditioning_frames(
 def get_initial_noisy_latent(
     noise_scheduler: DDPMScheduler,
     batch_size: int,
-    height: int,
-    width: int,
-    num_channels_latents: int,
-    vae_scale_factor: int,
+    latent_height: int,
+    latent_width: int,
+    latent_num_channels: int,
     device: torch.device,
     dtype=torch.float32,
 ):
     shape = (
         batch_size,
-        num_channels_latents,
-        int(height) // vae_scale_factor,
-        int(width) // vae_scale_factor,
+        latent_num_channels,
+        latent_height,
+        latent_width,
     )
     latents = randn_tensor(shape, generator=None, device=device, dtype=dtype)
 
@@ -90,7 +89,6 @@ def get_initial_noisy_latent(
 
 def next_latent(
     unet: UNet2DConditionModel,
-    vae: AutoencoderKL,
     noise_scheduler: DDPMScheduler,
     action_embedding: torch.nn.Embedding,
     context_latents: torch.Tensor,
@@ -106,16 +104,14 @@ def next_latent(
     latent_width = context_latents.shape[-1]
     num_channels_latents = context_latents.shape[2]
 
-    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
     with torch.no_grad(), autocast(device_type="cuda", dtype=torch.float32):
         # Generate initial noise for the target frame
         latents = get_initial_noisy_latent(
             noise_scheduler,
             batch_size,
-            HEIGHT + H_PAD,
-            WIDTH + W_PAD,
+            latent_height,
+            latent_width,
             num_channels_latents,
-            vae_scale_factor,
             device,
             dtype=unet.dtype,
         )
@@ -126,12 +122,14 @@ def next_latent(
 
         if not skip_action_conditioning:
             if do_classifier_free_guidance:
+                # repeat the actions twice for img-uncoditional and img-conditional tensors
                 encoder_hidden_states = action_embedding(actions.to(device)).repeat(
                     2, 1, 1
                 )
             else:
                 encoder_hidden_states = action_embedding(actions.to(device))
 
+        # Concatenate context latents and noisy prediction latent at time dimension
         latents = torch.cat([context_latents, latents.unsqueeze(1)], dim=1)
 
         # Fold the conditioning frames into the channel dimension
@@ -145,7 +143,7 @@ def next_latent(
                 uncond_latents[:, :BUFFER_SIZE] = torch.zeros_like(
                     uncond_latents[:, :BUFFER_SIZE]
                 )
-                # BEWARE: order is important, the unconditional case should come first
+                # BEWARE: order is important, the unconditional case should come first (concatenate at batch dimension)
                 latent_model_input = torch.cat([uncond_latents, latents])
             else:
                 latent_model_input = latents
@@ -164,9 +162,9 @@ def next_latent(
             )[0]
 
             if do_classifier_free_guidance:
-                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
                 noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond
+                    noise_pred_cond - noise_pred_uncond
                 )
 
             # Perform denoising step on the last frame only
