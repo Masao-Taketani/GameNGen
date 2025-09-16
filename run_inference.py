@@ -238,7 +238,6 @@ def run_inference_img_conditioning_with_params(
         )
         new_frame = next_latent(
             unet=unet,
-            vae=vae,
             noise_scheduler=noise_scheduler,
             action_embedding=action_embedding,
             context_latents=conditioning_frames_latents,
@@ -284,7 +283,6 @@ def run_inference_latent_conditioning_with_params(
         )
         new_frame = next_latent(
             unet=unet,
-            vae=vae,
             noise_scheduler=noise_scheduler,
             action_embedding=action_embedding,
             context_latents=conditioning_frames_latents,
@@ -296,10 +294,10 @@ def run_inference_latent_conditioning_with_params(
             guidance_scale=guidance_scale,
         )
 
-        # only take the last frame
-        image = decode_and_postprocess(
-            vae=vae, image_processor=image_processor, latents=new_frame
-        )
+    # only take the last frame
+    image = decode_and_postprocess(
+        vae=vae, image_processor=image_processor, latents=new_frame.cpu()
+    )
     return image
 
 

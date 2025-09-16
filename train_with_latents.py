@@ -54,7 +54,7 @@ from config_sd import (
 )
 from dataset import get_dataloader_mod
 from model import get_model, save_and_maybe_upload_to_hub
-from run_inference import run_inference_img_conditioning_with_params
+from run_inference import run_inference_latent_conditioning_with_params
 from utils import add_conditioning_noise, get_conditioning_noise
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
@@ -1051,7 +1051,7 @@ def main():
                                 if args.skip_image_conditioning:
                                     raise NotImplementedError("Not supported anymore")
                                 else:
-                                    generated_image = run_inference_img_conditioning_with_params(
+                                    generated_image = run_inference_latent_conditioning_with_params(
                                         unet=accelerator.unwrap_model(comb_train_model).unet,
                                         vae=vae,
                                         noise_scheduler=noise_scheduler,
