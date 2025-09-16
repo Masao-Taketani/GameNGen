@@ -610,9 +610,9 @@ def main():
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move comb_train_model, vae and text_encoder to device and cast to weight_dtype
+    # Move comb_train_model and text_encoder to device and cast to weight_dtype
     comb_train_model.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
+    #vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     if args.mixed_precision == "fp16":
@@ -812,10 +812,7 @@ def main():
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(comb_train_model):
                 if args.skip_image_conditioning:
-                    latents = vae.encode(
-                        batch["pixel_values"].to(dtype=weight_dtype)
-                    ).latent_dist.sample()
-                    latents = latents * vae.config.scaling_factor
+                    latents = batch["latent_values"].to(dtype=weight_dtype) * vae.config.scaling_factor
 
                     # Sample noise that we'll add to the latents
                     noise = torch.randn_like(latents)
@@ -842,19 +839,7 @@ def main():
                     # Just to keep the same var as with the image conditioning
                     concatenated_latents = noisy_latents
                 else:
-                    bs, buffer_len, channels, height, width = batch[
-                        "pixel_values"
-                    ].shape
-
-                    # Fold buffer len in to batch for encoding in one go
-                    folded_conditional_images = batch["pixel_values"].view(
-                        bs * buffer_len, channels, height, width
-                    )
-
-                    latents = vae.encode(
-                        folded_conditional_images.to(dtype=weight_dtype)
-                    ).latent_dist.sample()
-                    latents = latents * vae.config.scaling_factor
+                    latents = batch["latent_values"] * vae.config.scaling_factor
 
                     _, latent_channels, latent_height, latent_width = latents.shape
                     # Separate back the conditioning frames
