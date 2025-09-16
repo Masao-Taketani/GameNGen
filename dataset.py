@@ -9,9 +9,10 @@ import os
 import logging
 import math
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
+import numpy as np
 
 from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
-from data_augmentation import no_img_conditioning_augmentation
+from data_augmentation import no_img_conditioning_augmentation, no_latent_img_conditioning_augmentation
 
 
 IMG_TRANSFORMS = transforms.Compose(
@@ -127,9 +128,10 @@ class EpisodeDatasetLatent:
             latents = DiagonalGaussianDistribution(parameters[:pred_idx+1]).sample()
             latents = torch.concat([padding, latents])
             actions = torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:pred_idx+1]])
-            return {'latent_values': latents, 'input_ids': actions}
-        parameters, actions = parameters[pred_idx-BUFFER_SIZE:pred_idx+1], actions[pred_idx-BUFFER_SIZE:pred_idx+1]
-        latents = DiagonalGaussianDistribution(parameters).sample()
+        else:
+            parameters, actions = parameters[pred_idx-BUFFER_SIZE:pred_idx+1], actions[pred_idx-BUFFER_SIZE:pred_idx+1]
+            latents = DiagonalGaussianDistribution(parameters).sample()
+
         return {'latent_values': latents, 'input_ids': actions}
 
 
@@ -175,6 +177,10 @@ def get_dataloader_prep(basepath: str, num_chunk: int = None, chunk_id: int = No
 def get_dataloader_mod(basepath: str, action_dim: int, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
     dataset = EpisodeDatasetMod(basepath, action_dim)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, num_workers=num_workers, persistent_workers=True, drop_last=True)
+
+def get_latent_dataloader(basepath: str, action_dim: int, batch_size: int = 1, num_workers: int = 1, shuffle: bool = False) -> torch.utils.data.DataLoader:
+    dataset = EpisodeDatasetLatent(basepath, action_dim)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, persistent_workers=True, drop_last=True)
 
 def get_single_batch(dataset_name: str) -> dict[str, torch.Tensor]:
     dataloader = get_dataloader(dataset_name, batch_size=1, num_workers=1, shuffle=False)

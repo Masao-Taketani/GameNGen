@@ -52,10 +52,11 @@ from config_sd import (
     VALIDATION_PROMPT,
     ZERO_OUT_ACTION_CONDITIONING_PROB,
 )
-from dataset import get_dataloader_mod
+from dataset import get_latent_dataloader
 from model import get_model, save_and_maybe_upload_to_hub
 from run_inference import run_inference_latent_conditioning_with_params
 from utils import add_conditioning_noise, get_conditioning_noise
+from data_augmentation import no_latent_img_conditioning_augmentation
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 # check_min_version("0.31.0.dev0")
@@ -700,7 +701,7 @@ def main():
                                       weight_decay=args.weight_decay,
             )
 
-    train_dataloader = get_dataloader_mod(
+    train_dataloader = get_latent_dataloader(
         basepath=args.dataset_basepath,
         action_dim=action_dim,
         batch_size=args.train_batch_size,
@@ -810,6 +811,8 @@ def main():
         comb_train_model.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
+            # Drop conditional latent images with a specified probability for CFG
+            batch["latent_values"] = no_latent_img_conditioning_augmentation(batch["latent_values"], prob=ZERO_OUT_ACTION_CONDITIONING_PROB)
             with accelerator.accumulate(comb_train_model):
                 if args.skip_image_conditioning:
                     latents = batch["latent_values"].to(dtype=weight_dtype) * vae.config.scaling_factor
