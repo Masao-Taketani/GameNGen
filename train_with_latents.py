@@ -742,7 +742,7 @@ def main():
 
     logger.info("***** Running training *****")
     logger.info(f"  Dataset base directory = {args.dataset_basepath}")
-    logger.info(f"  Num examples = {len(dataset)}")
+    logger.info(f"  Num examples = {len(train_dataloader.dataset)}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(
         f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
@@ -842,13 +842,9 @@ def main():
                     # Just to keep the same var as with the image conditioning
                     concatenated_latents = noisy_latents
                 else:
-                    latents = batch["latent_values"] * vae.config.scaling_factor
+                    bs, buffer_len, latent_channels, latent_height, latent_width = batch["latent_values"].shape
 
-                    _, latent_channels, latent_height, latent_width = latents.shape
-                    # Separate back the conditioning frames
-                    latents = latents.view(
-                        bs, buffer_len, latent_channels, latent_height, latent_width
-                    )
+                    latents = batch["latent_values"] * vae.config.scaling_factor
 
                     # Generate noise with the same shape as latents
                     # Careful with the indexing here

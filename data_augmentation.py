@@ -41,8 +41,6 @@ def no_latent_img_conditioning_augmentation(
     no_latent_img_conditioning_prob = turn_off_conditioning_prob < prob
     no_latent_img_conditioning_prob = no_latent_img_conditioning_prob.unsqueeze(1).expand(
         -1, latents.shape[1] - 1, -1, -1, -1)
-    print(latents.shape)
-    print("no_latent_img_conditioning_prob", no_latent_img_conditioning_prob.shape, latents.shape)
     latents[:, :-1] = torch.where(no_latent_img_conditioning_prob,
                                   torch.zeros_like(latents[:, :-1]),
                                   latents[:, :-1])
