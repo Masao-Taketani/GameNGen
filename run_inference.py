@@ -49,19 +49,19 @@ def encode_conditioning_frames(
 
 
 def prepare_conditioning_frames(
-    latents: torch.Tensor, device: torch.device, dtype: torch.dtype
+    vae: AutoencoderKL, latents: torch.Tensor, device: torch.device, dtype: torch.dtype
 ) -> torch.Tensor:
     batch_size, _, channels, height, width = latents.shape
-    conditioning_frame_latents = latents.to(device=device, dtype=dtype) * vae.config.scaling_factor
+    conditioning_frame_latents = latents[:, :BUFFER_SIZE].to(device=device, dtype=dtype) * vae.config.scaling_factor
 
     # Reshape context latents
-    conditioning_frame_latents = conditioning_frame_latents.reshape(
-        batch_size,
-        BUFFER_SIZE,
-        vae.config.latent_channels,
-        height,
-        width,
-    )
+    #conditioning_frame_latents = conditioning_frame_latents.reshape(
+    #    batch_size,
+    #    BUFFER_SIZE,
+    #    vae.config.latent_channels,
+    #    height,
+    #    width,
+    #)
     return conditioning_frame_latents
 
 
@@ -277,6 +277,7 @@ def run_inference_latent_conditioning_with_params(
         actions = batch["input_ids"]
 
         conditioning_frames_latents = prepare_conditioning_frames(
+            vae,
             latents=batch["latent_values"],
             device=unet.device,
             dtype=torch.float32,
