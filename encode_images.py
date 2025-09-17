@@ -74,6 +74,14 @@ def save_data_as_npz(dpath, epi_id, parameters, actions):
     path = os.path.join(dpath, f"latent_episode_{epi_id}.npz")
     np.savez(path, parameters=parameters, actions=actions)
 
+def save_data_as_pt(dpath, epi_id, parameters, actions):
+    path = os.path.join(dpath, f"latent_episode_{epi_id}.pt")
+    data = {
+        "parameters": parameters,
+        "actions": actions
+    }
+    torch.save(data, path)
+
 def main():
     args = parse_args()
     if torch.cuda.is_available():
@@ -104,9 +112,11 @@ def main():
         for i in range(0, len(imgs), args.batch_size):
             bs_imgs = imgs[i:i+args.batch_size].to(device, dtype=weight_dtype)
             with torch.inference_mode():
-                parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data.numpy()
+                #parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data.numpy()
+                parameters = vae.encode(bs_imgs).latent_dist.parameters.cpu().float().data
                 params.append(parameters)
-        save_data_as_npz(args.save_dir_path, start_epi_id+epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())
+        #save_data_as_npz(args.save_dir_path, start_epi_id+epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())
+        save_data_as_pt(args.save_dir_path, start_epi_id+epi_id, torch.cat(params, dim=0), acts.squeeze(dim=0))
 
 
 if __name__ == "__main__":
