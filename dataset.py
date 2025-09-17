@@ -10,6 +10,7 @@ import logging
 import math
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
 import numpy as np
+import time
 
 from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD, BUFFER_SIZE, ZERO_OUT_ACTION_CONDITIONING_PROB
 from data_augmentation import no_img_conditioning_augmentation, no_latent_img_conditioning_augmentation
@@ -108,18 +109,18 @@ class EpisodeDatasetLatent:
         self.samples = []
         for dirpath, dirnames, filenames in os.walk(basepath):
             for filename in filenames:
-                if filename.split(".")[-1] == "npz": self.samples.append(os.path.join(dirpath, filename))
+                if filename.split(".")[-1] == "pt": self.samples.append(os.path.join(dirpath, filename))
 
     def __len__(self) -> int:
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         path = self.samples[idx]
-        epi_data = np.load(path)
+        epi_data = torch.load(path)
         length = len(epi_data)
-        parameters = torch.tensor(epi_data["parameters"])
-        actions = torch.tensor(epi_data["actions"])
-
+        parameters = epi_data["parameters"]
+        actions = epi_data["actions"]
+        
         # Since each data has to include the buffer (0<=buffer<=BUFFER_SIZE) and label (prediction idx), the prediction idx has to be at least 0
         # and up to length - 1
         pred_idx = random.randint(0, length-1)
@@ -131,7 +132,7 @@ class EpisodeDatasetLatent:
         else:
             parameters, actions = parameters[pred_idx-BUFFER_SIZE:pred_idx+1], actions[pred_idx-BUFFER_SIZE:pred_idx+1]
             latents = DiagonalGaussianDistribution(parameters).sample()
-
+        
         return {'latent_values': latents, 'input_ids': actions}
 
 
