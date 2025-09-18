@@ -261,7 +261,6 @@ def run_inference_latent_conditioning_with_params(
     vae,
     noise_scheduler,
     action_embedding,
-    tokenizer,
     text_encoder,
     batch,
     device,

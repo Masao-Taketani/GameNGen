@@ -1040,7 +1040,6 @@ def main():
                                         vae=vae,
                                         noise_scheduler=noise_scheduler,
                                         action_embedding=accelerator.unwrap_model(comb_train_model).action_embedding,
-                                        tokenizer=tokenizer,
                                         text_encoder=text_encoder,
                                         batch=single_sample_batch,
                                         device=accelerator.device,
