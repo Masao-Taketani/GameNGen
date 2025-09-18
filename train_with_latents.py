@@ -552,8 +552,7 @@ def main():
 
     # This is a bit wasteful
     action_dim = args.action_dim
-
-    comb_train_model, vae, noise_scheduler, tokenizer, text_encoder = get_model(
+    comb_train_model, vae, noise_scheduler, text_encoder = get_model(
         action_dim, skip_image_conditioning=args.skip_image_conditioning
     )
 
@@ -613,8 +612,9 @@ def main():
 
     # Move comb_train_model and text_encoder to device and cast to weight_dtype
     comb_train_model.to(accelerator.device, dtype=weight_dtype)
-    #vae.to(accelerator.device, dtype=weight_dtype)
-    text_encoder.to(accelerator.device, dtype=weight_dtype)
+    if args.skip_action_conditioning:
+        #vae.to(accelerator.device, dtype=weight_dtype)
+        text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters into fp32

@@ -57,8 +57,7 @@ def get_model(
     CombinedTrainModel,
     AutoencoderKL,
     DDIMScheduler,
-    CLIPTokenizer,
-    CLIPTextModel,
+    CLIPTextModel | None,
 ]:
     """
     Args:
@@ -91,14 +90,13 @@ def get_model(
         NUM_BUCKETS, unet.time_embedding.linear_2.out_features
     )
 
-    tokenizer = CLIPTokenizer.from_pretrained(
-        PRETRAINED_MODEL_NAME_OR_PATH, subfolder="tokenizer"
-    )
-    text_encoder = CLIPTextModel.from_pretrained(
-        PRETRAINED_MODEL_NAME_OR_PATH, subfolder="text_encoder"
-    )
+    text_encoder = None
 
     if not skip_image_conditioning:
+        text_encoder = CLIPTextModel.from_pretrained(
+            PRETRAINED_MODEL_NAME_OR_PATH, subfolder="text_encoder"
+        )
+        text_encoder.requires_grad_(False)
         # This is to accomodate concatenating previous frames in the channels dimension
         new_in_channels = 4 * (BUFFER_SIZE + 1)
         new_conv_in = nn.Conv2d(
@@ -116,8 +114,8 @@ def get_model(
 
     comb_train_model.requires_grad_(True)
     vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
-    return comb_train_model, vae, noise_scheduler, tokenizer, text_encoder
+    
+    return comb_train_model, vae, noise_scheduler, text_encoder
 
 
 def load_embedding_info_dict(model_folder: str) -> dict:
