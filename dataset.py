@@ -117,7 +117,7 @@ class EpisodeDatasetLatent:
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         path = self.samples[idx]
         epi_data = torch.load(path)
-        length = len(epi_data)
+        length = epi_data["parameters"].shape[0]
         parameters = epi_data["parameters"]
         actions = epi_data["actions"]
         
