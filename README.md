@@ -4,8 +4,9 @@ This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I ha
 
 ## Modifications
 Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main).
-- Fixed the environment setup with Anaconda and write down the precise commands in order to properly reproduce the code.
-- Fixed the training steps to properly train the PPO agents within VizDoom environment
+- Fixed the environment setup with Anaconda and write down the precise commands in order to properly reproduce the code (For this development, I start from `continuumio/anaconda3:latest` Docker image).
+- Use the original paper's training setup as much as I can
+- Incorporate much more efficient diffusion training method and data files
 
 ## To Do
 - [x] Set `MOVE_LEFT` and `MOVE_RIGHT` as independent actions
@@ -24,6 +25,9 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
   - [x] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters with multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668)
   - [x] Pad every image frame to get 320x256 from 320x240
   - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
+- [x] Efficient Diffusion Training
+  - [x] Convert image dataset into latent embedding one and train only using the embeddings from the beginning, not handling image dataset at all during the training
+  - [x] Convert dataset file format from `.parquet` (for images & actions) to `.pt` (for latent embeddings & actions) to directly handle Torch tensors to train
 
 ## Artifacts
 
@@ -67,6 +71,17 @@ python load_model_generate_dataset.py --episodes {number of episodes} --output p
 Note: you can also generate a gif file to QA the behavior of the agent by running:
 ```
 python load_model_generate_dataset.py --episodes 1 --output gif
+```
+
+### Convert image dataset to latent embedding dataset
+You are going to convert the collected image dataset (`.parquet` files) into latent embedding dataset (`.pt` files), so that you can save lots of memory during diffusion training. For that, you are recommended to use at least one GPU. Use the following command to execute with single GPU.
+```
+python encode_images.py --dataset_basepath [directory path under which parquet files are placed] --save_dir_path [pt file save directory path] --dataloader_num_workers [number of workers for dataloader] --batch_size [batch size to process for one step] --dtype [data type used for inference]
+```
+
+You can also use multiple GPUs to process the conversion in parallel (each GPU processes handles a different episode). In order to do that, specify number of chunks for parallel processing. Also, specifry which chunk id each GPU process needs to handle. Lastly, assign GPU ID for each process. For example, if you device to use 3 GPUs, the number of chunks should be 3, chunk ID and GPU ID should be a number between 0 and 2. Use the following command to execute with multiple GPUs.
+```
+python encode_images.py --dataset_basepath [directory path under which parquet files are placed] --save_dir_path [pt file save directory path] --dataloader_num_workers [number of workers for dataloader] --batch_size [batch size to process for one step] --dtype [data type used for inference] --num_chunks [number of chunks to split your dataset] --chunk_id [chunk ID] --gpu_id [GPU ID]
 ```
 
 
