@@ -79,7 +79,7 @@ You are going to convert the collected image dataset (`.parquet` files) into lat
 python encode_images.py --dataset_basepath [directory path under which parquet files are placed] --save_dir_path [pt file save directory path] --dataloader_num_workers [number of workers for dataloader] --batch_size [batch size to process for one step] --dtype [data type used for inference]
 ```
 
-You can also use multiple GPUs to process the conversion in parallel (each GPU processes handles a different episode). In order to do that, specify number of chunks for parallel processing. Also, specifry which chunk ID each GPU process needs to handle. Lastly, assign GPU ID to run the command. For example, if you device to use 3 GPUs, the number of chunks should be 3, chunk ID and GPU ID should be a number between 0 and 2. Use the following command to execute with multiple GPUs.
+You can also use multiple GPUs to process the conversion in parallel (each GPU processes handles a different episode). In order to do that, specify number of chunks for parallel processing. Also, specifry which chunk ID each GPU process needs to handle. Lastly, assign GPU ID to run the command. For example, if you decide to use 3 GPUs, the number of chunks should be 3, chunk ID and GPU ID should be a number between 0 and 2. Use the following command to execute with multiple GPUs.
 ```
 python encode_images.py --dataset_basepath [directory path under which parquet files are placed] --save_dir_path [pt file save directory path] --dataloader_num_workers [number of workers for dataloader] --batch_size [batch size to process for one step] --dtype [data type used for inference] --num_chunks [number of chunks to split your dataset] --chunk_id [chunk ID] --gpu_id [GPU ID]
 ```
