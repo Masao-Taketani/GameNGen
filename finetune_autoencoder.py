@@ -15,23 +15,85 @@ import wandb
 from dataset import preprocess_train
 
 # Fine-tuning parameters
-NUM_EPOCHS = 2
 NUM_WARMUP_STEPS = 500
-BATCH_SIZE = 16
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-5
 GRADIENT_CLIP_NORM = 1.0
-EVAL_STEP = 1000
 
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Fine-tune VAE model")
     parser.add_argument(
-        "--hf_model_folder",
+        "--report_to",
         type=str,
-        required=True,
-        help="HuggingFace model folder to save the model to",
+        default="tensorboard",
+        help=(
+            'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
+            ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
+        ),
+    )
+    parser.add_argument(
+        "--dataset_basepath",
+        type=str,
+        help=(
+            "The parquet dataset base path pointing a folder containing files that 🤗 Datasets can understand to train on."
+        ),
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="sd-model-finetuned",
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=2,
+        help="Batch size (per device) for dataloader.",
+    )
+    parser.add_argument(
+        "--max_train_steps",
+        type=int,
+        default=700000,
+        help="Total number of training steps to perform.",
+        required=True
+    )
+    parser.add_argument(
+        "--validation_steps",
+        type=int,
+        default=50,
+        help=(
+            "Run fine-tuning validation every 50 steps. The validation process consists of running the model on a batch of images"
+        ),
+    )
+    parser.add_argument(
+        "--learning_rate",
+        type=float,
+        default=2e-5,
+        help="Initial learning rate (after the potential warmup period) to use.",
+    )
+    parser.add_argument(
+        "--dataloader_num_workers",
+        type=int,
+        default=4,
+        help=(
+            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
+        ),
+    )
+    parser.add_argument(
+        "--gradient_clipping", default=1.0, type=float, help="Gradient clipping."
+    )
+    parser.add_argument(
+        "--push_to_hub",
+        action="store_true",
+        help="Whether or not to push your model to the Hugging Face model hub after saving it.",
+    )
+    parser.add_argument(
+        "--repo_id",
+        type=str,
+        default=None,
+        help="Hugging Face repo ID used when push_to_hub is True.",
     )
     return parser.parse_args()
 
@@ -72,34 +134,34 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
 
 def main():
     args = parse_args()
-    wandb.init(
-        project="gamengen-vae-training",
-        config={
-            # Model parameters
-            "model": PRETRAINED_MODEL_NAME_OR_PATH,
-            # Training parameters
-            "num_epochs": NUM_EPOCHS,
-            "eval_step": EVAL_STEP,
-            "batch_size": BATCH_SIZE,
-            "learning_rate": LEARNING_RATE,
-            "weight_decay": WEIGHT_DECAY,
-            "warmup_epochs": NUM_WARMUP_STEPS,
-            "gradient_clip_norm": GRADIENT_CLIP_NORM,
-            "hf_model_folder": args.hf_model_folder,
-        },
-        name=f"vae-finetuning-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
-    )
+    if args.report_to == "wandb":
+        import wandb
+        wandb.init(
+            project="gamengen-vae-training",
+            config={
+                # Model parameters
+                "model": PRETRAINED_MODEL_NAME_OR_PATH,
+                # Training parameters
+                "num_steps": args.max_train_steps,
+                "eval_step": args.validation_steps,
+                "batch_size": args.batch_size,
+                "learning_rate": args.learning_rate,
+                "gradient_clip_norm": args.gradient_clipping,
+                "hf_model_folder": args.hf_model_folder,
+            },
+            name=f"vae-finetuning-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
+        )
 
     # Dataset Setup
-    dataset = load_dataset("arnaudstiegler/vizdoom-500-episodes-skipframe-4-lvl5")
+    dataset = load_dataset(args.dataset_basepath)
     split_dataset = dataset["train"].train_test_split(test_size=500, seed=42)
     train_dataset = split_dataset["train"].with_transform(preprocess_train)
     test_dataset = split_dataset["test"].with_transform(preprocess_train)
     train_loader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8
+        train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
+        test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8
     )
     # Model Setup
     vae = AutoencoderKL.from_pretrained(PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae")
@@ -135,7 +197,7 @@ def main():
             loss = F.mse_loss(reconstruction, data, reduction="mean")
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), GRADIENT_CLIP_NORM)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.gradient_clipping)
             optimizer.step()
             scheduler.step()
 
@@ -144,23 +206,24 @@ def main():
 
             progress_bar.set_postfix({"loss": loss.item(), "lr": current_lr})
 
-            wandb.log(
-                {
-                    "train_loss": loss.item(),
-                    "learning_rate": current_lr,
-                }
-            )
+            if args.report_to == "wandb":
+                wandb.log(
+                    {
+                        "train_loss": loss.item(),
+                        "learning_rate": current_lr,
+                    }
+                )
 
             step += 1
-            if step % EVAL_STEP == 0:
+            if step % args.validation_steps == 0:
                 test_loss = eval_model(model, test_loader)
                 # save model to hub
                 model.save_pretrained(
-                    "test",
-                    repo_id=args.hf_model_folder,
-                    push_to_hub=True,
+                    os.path.join(args.output_dir, "vae"),
+                    repo_id=args.repo_id if args.push_to_hub else None,
+                    push_to_hub=args.push_to_hub,
                 )
-                wandb.log({"test_loss": test_loss})
+                if args.report_to == "wandb": wandb.log({"test_loss": test_loss})
 
 
 if __name__ == "__main__":

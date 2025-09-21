@@ -135,7 +135,7 @@ def parse_args():
         type=str,
         default=TRAINING_DATASET_DICT["small"],
         help=(
-            "The Dataset base path pointing a folder containing files that 🤗 Datasets can understand to train on."
+            "The latent dataset base path pointing a folder containing pt files."
         ),
     )
     parser.add_argument(
