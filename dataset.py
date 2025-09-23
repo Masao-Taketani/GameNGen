@@ -109,7 +109,7 @@ class EpisodeDatasetLatent:
         self.samples = []
         for dirpath, dirnames, filenames in os.walk(basepath):
             for filename in filenames:
-                if filename.split(".")[-1] == "pt": self.samples.append(os.path.join(dirpath, filename))
+                if filename.split(".")[-1] == "pt" and filename != "latent_black.pt": self.samples.append(os.path.join(dirpath, filename))
 
     def __len__(self) -> int:
         return len(self.samples)
