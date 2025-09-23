@@ -6,6 +6,7 @@ import torch
 
 from model import get_ft_vae_decoder
 from dataset import get_dataloader_prep
+from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD
 
 
 def parse_args():
@@ -82,6 +83,15 @@ def save_data_as_pt(dpath, epi_id, parameters, actions):
     }
     torch.save(data, path)
 
+# This is used when prediction index is less than buffer size. For more details, please check the following part of code.
+# https://github.com/Masao-Taketani/GameNGen/blob/834d3d081ef782a92bb6928fe66cb88b8aa9c7d7/dataset.py#L127
+def save_latent_black(dpath, vae, device, weight_dtype):
+    black_img = torch.zeros(1, 3, HEIGHT + H_PAD, WIDTH + W_PAD).to(device, dtype=weight_dtype)
+    # Leave the batch dim of parameters as 1, so that it is used as time dimension during training data preparation.
+    parameters = vae.encode(black_img).latent_dist.parameters.cpu().float().data
+    path = os.path.join(dpath, f"latent_black.pt")
+    torch.save(parameters, path)
+
 def main():
     args = parse_args()
     if torch.cuda.is_available():
@@ -117,6 +127,8 @@ def main():
                 params.append(parameters)
         #save_data_as_npz(args.save_dir_path, start_epi_id+epi_id, np.concatenate(params, axis=0), acts.squeeze(dim=0).numpy())
         save_data_as_pt(args.save_dir_path, start_epi_id+epi_id, torch.cat(params, dim=0), acts.squeeze(dim=0))
+    
+    save_latent_black(args.save_dir_path, vae, device, weight_dtype)
 
 
 if __name__ == "__main__":

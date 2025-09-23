@@ -114,6 +114,10 @@ class EpisodeDatasetLatent:
     def __len__(self) -> int:
         return len(self.samples)
 
+    def load_latent_black(self, data_path):
+        dpath = os.path.dirname(data_path)
+        return torch.load(os.path.join(dpath, "latent_black.pt"))
+
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         path = self.samples[idx]
         epi_data = torch.load(path)
@@ -125,7 +129,8 @@ class EpisodeDatasetLatent:
         # and up to length - 1
         pred_idx = random.randint(0, length-1)
         if pred_idx < BUFFER_SIZE:
-            padding = torch.zeros([BUFFER_SIZE - pred_idx, parameters.shape[1]//2, *parameters.shape[2:]])
+            latent_black = self.load_latent_black(path)
+            padding = DiagonalGaussianDistribution(latent_black.repeat(BUFFER_SIZE - pred_idx, 1, 1, 1)).sample()
             latents = DiagonalGaussianDistribution(parameters[:pred_idx+1]).sample()
             latents = torch.concat([padding, latents])
             actions = torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:pred_idx+1]])
