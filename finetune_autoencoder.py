@@ -1,9 +1,12 @@
+import os
 from datetime import datetime
 import argparse
+import math
+import time
 
 import torch
 import torch.nn.functional as F
-from datasets import load_dataset
+from datasets import load_dataset, preprocess_train
 from diffusers import AutoencoderKL
 from torch import optim
 from torch.utils.data import DataLoader
@@ -12,7 +15,6 @@ from transformers import get_cosine_schedule_with_warmup
 from config_sd import PRETRAINED_MODEL_NAME_OR_PATH
 
 import wandb
-from dataset import preprocess_train
 
 # Fine-tuning parameters
 NUM_WARMUP_STEPS = 500
@@ -51,6 +53,18 @@ def parse_args():
         type=int,
         default=2,
         help="Batch size (per device) for dataloader.",
+    )
+    parser.add_argument(
+        "--num_chunks",
+        type=int,
+        default=70,
+        help="Specify the number of chunks which are rotated for dataloader to train.",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=96,
+        help="Number of workers used for dataloader.",
     )
     parser.add_argument(
         "--max_train_steps",
@@ -132,6 +146,35 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
         return test_loss / len(test_loader)
 
 
+def collect_all_parquet_files(basepath):
+    samples = []
+    for dirpath, dirnames, filenames in os.walk(basepath):
+        for filename in filenames:
+            if filename.split(".")[-1] == "parquet": samples.append(os.path.join(dirpath, filename))
+    return samples
+
+
+def change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, batch_size, num_workers):
+    print("About to change/prepare dataset for dataloader")
+    start = time.perf_counter()
+    if chunk_id < plus_one_idx: samples_per_chunk += 1
+    paths = samples[chunk_id*samples_per_chunk:(chunk_id+1)*samples_per_chunk]
+    dataset = Dataset.from_parquet(paths)
+    end = time.perf_counter()
+    time_diff = end - start
+    print(f"Done changing/preparing dataset for dataloader. It took {time_diff:.0f} sec for chunk ID {chunk_id}.")
+    dataset = dataset.with_transform(preprocess_train)
+    dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
+    return dataloader
+
+
+def update_chunk_id(chunk_id, num_chunks):
+    chunk_id += 1
+    chunk_id %= num_chunk
+    return chunk_id
+
 def main():
     args = parse_args()
     if args.report_to == "wandb":
@@ -152,17 +195,15 @@ def main():
             name=f"vae-finetuning-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
         )
 
+    parquet_paths = collect_all_parquet_files(args.dataset_basepath)
+    random.shuffle(parquet_paths)
+    samples_per_chunk = len(parquet_paths) // args.num_chunks
+    plus_one_idx = len(parquet_paths) - samples_per_chunk * args.num_chunks
+    
     # Dataset Setup
-    dataset = load_dataset(args.dataset_basepath)
-    split_dataset = dataset["train"].train_test_split(test_size=500, seed=42)
-    train_dataset = split_dataset["train"].with_transform(preprocess_train)
-    test_dataset = split_dataset["test"].with_transform(preprocess_train)
-    train_loader = DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8
-    )
-    test_loader = DataLoader(
-        test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8
-    )
+    chunk_id = 0
+    dataloader = change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, batch_size, num_workers)
+
     # Model Setup
     vae = AutoencoderKL.from_pretrained(PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -224,6 +265,8 @@ def main():
                     push_to_hub=args.push_to_hub,
                 )
                 if args.report_to == "wandb": wandb.log({"test_loss": test_loss})
+            
+    update_chunk_id(chunk_id, num_chunks)
 
 
 if __name__ == "__main__":
