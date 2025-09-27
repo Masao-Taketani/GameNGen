@@ -16,12 +16,6 @@ from config_sd import PRETRAINED_MODEL_NAME_OR_PATH
 
 import wandb
 
-# Fine-tuning parameters
-NUM_WARMUP_STEPS = 500
-LEARNING_RATE = 1e-4
-WEIGHT_DECAY = 1e-5
-GRADIENT_CLIP_NORM = 1.0
-
 
 def parse_args():
     """Parse command line arguments."""
@@ -82,10 +76,37 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--chunk_id_interval",
+        type=int,
+        default=10000,
+        help=(
+            "Change chunk ID for the specified interval."
+        ),
+    )
+    parser.add_argument(
+        "--use_adamw",
+        action="store_true",
+        help=(
+            "Whether or not to use AdamW optimizer. If 'use_adamw' is not True, "
+            "the default optimizer Adafactor, which is used in the paper, is used."
+        ),
+    )
+    parser.add_argument(
         "--learning_rate",
         type=float,
         default=2e-5,
         help="Initial learning rate (after the potential warmup period) to use.",
+    )
+    parser.add_argument(
+        "--lr_scheduler",
+        type=str,
+        default="constant",
+        help=(
+            'The scheduler type to use. Choose between ["cosine", "constant", "constant_with_warmup"]'
+        ),
+    )
+    parser.add_argument(
+        "--weight_decay", type=float, default=0.0, help="Weight decay to use."
     )
     parser.add_argument(
         "--dataloader_num_workers",
@@ -145,6 +166,26 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
             )
         return test_loss / len(test_loader)
 
+
+def eval_model_mod(model: AutoencoderKL, data: torch.tensor) -> float:
+    model.eval()
+    with torch.no_grad():
+        """
+        The following part is not sampled as for the encoder output according to the link below.
+        https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
+        Don't know why. May change it later.
+        """
+        reconstruction = model(data).sample
+        loss = F.mse_loss(reconstruction, data, reduction="mean")
+
+        recon = model.decode(model.encode(data).latent_dist.sample()).sample
+        wandb.log(
+            {
+                "original": [wandb.Image(img) for img in data],
+                "reconstructed": [wandb.Image(img) for img in recon],
+            }
+        )
+        return loss.item()
 
 def collect_all_parquet_files(basepath):
     samples = []
@@ -210,21 +251,31 @@ def main():
     model = vae.to(device)
     make_decoder_trainable(model)
     # Optimizer Setup
-    optimizer = optim.AdamW(
-        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+    optimizer_cls = optim.AdamW if args.use_adamw else optim.Adafactor
+    optimizer = optimizer_cls(
+        model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
     )
-    scheduler = get_cosine_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=NUM_WARMUP_STEPS,
-        num_training_steps=NUM_EPOCHS * len(train_loader),
-    )
+
+    if args.lr_scheduler == "constant_with_warmup":
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=NUM_WARMUP_STEPS,
+            num_training_steps=NUM_EPOCHS * len(train_loader),
+        )
 
     step = 0
-    for epoch in range(NUM_EPOCHS):
-        train_loss = 0
-        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{NUM_EPOCHS}")
-
-        for batch in progress_bar:
+    progress_bar = tqdm(
+                        range(step, args.max_train_steps),
+                        initial=step,
+                        total=args.max_train_steps,
+                        desc="Steps",
+                        # Only show the progress bar once on each machine.
+                        #disable=not accelerator.is_local_main_process,
+                   )
+    
+    break_while = False
+    while True:
+        for batch in train_dataloader:
             model.train()
             data = batch["pixel_values"].to(device)
             optimizer.zero_grad()
@@ -240,33 +291,35 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.gradient_clipping)
             optimizer.step()
-            scheduler.step()
+            if args.lr_scheduler == "constant_with_warmup": scheduler.step()
 
-            train_loss += loss.item()
-            current_lr = scheduler.get_last_lr()[0]
+            if args.lr_scheduler == "constant_with_warmup": current_lr = scheduler.get_last_lr()[0]
 
-            progress_bar.set_postfix({"loss": loss.item(), "lr": current_lr})
+            log_dic = {"loss": loss.item()}
+            if args.lr_scheduler == "constant_with_warmup": log_dic["lr"] = current_lr
+            progress_bar.set_postfix(log_dic)
+            if args.report_to == "wandb": wandb.log(log_dic)
 
-            if args.report_to == "wandb":
-                wandb.log(
-                    {
-                        "train_loss": loss.item(),
-                        "learning_rate": current_lr,
-                    }
-                )
-
+            progress_bar.update(1)
             step += 1
+
             if step % args.validation_steps == 0:
-                test_loss = eval_model(model, test_loader)
+                # Use only two samples for validation
+                val_loss = eval_model_mod(model, data[:2])
                 # save model to hub
                 model.save_pretrained(
                     os.path.join(args.output_dir, "vae"),
                     repo_id=args.repo_id if args.push_to_hub else None,
                     push_to_hub=args.push_to_hub,
                 )
-                if args.report_to == "wandb": wandb.log({"test_loss": test_loss})
-            
-    update_chunk_id(chunk_id, num_chunks)
+                #if args.report_to == "wandb": wandb.log({"val_loss": val_loss})
+
+            if step >= args.max_train_steps:
+                break_while = True
+                break
+            if step % args.chunk_id_interval == 0: chunk_id = update_chunk_id(chunk_id, num_chunks)
+        
+        if break_while: break
 
 
 if __name__ == "__main__":
