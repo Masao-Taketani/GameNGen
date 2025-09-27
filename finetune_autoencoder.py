@@ -3,16 +3,19 @@ from datetime import datetime
 import argparse
 import math
 import time
+import random
 
 import torch
 import torch.nn.functional as F
-from datasets import load_dataset, preprocess_train
 from diffusers import AutoencoderKL
 from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import get_cosine_schedule_with_warmup
 from config_sd import PRETRAINED_MODEL_NAME_OR_PATH
+from dataset import preprocess_train
+from datasets import Dataset
+import datasets
 
 import wandb
 
@@ -65,12 +68,11 @@ def parse_args():
         type=int,
         default=700000,
         help="Total number of training steps to perform.",
-        required=True
     )
     parser.add_argument(
         "--validation_steps",
         type=int,
-        default=50,
+        default=1000,
         help=(
             "Run fine-tuning validation every 50 steps. The validation process consists of running the model on a batch of images"
         ),
@@ -109,14 +111,6 @@ def parse_args():
         "--weight_decay", type=float, default=0.0, help="Weight decay to use."
     )
     parser.add_argument(
-        "--dataloader_num_workers",
-        type=int,
-        default=4,
-        help=(
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
-        ),
-    )
-    parser.add_argument(
         "--gradient_clipping", default=1.0, type=float, help="Gradient clipping."
     )
     parser.add_argument(
@@ -153,21 +147,21 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
             https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
             Don't know why. May change it later.
             """
-            reconstruction = model(data).sample
+            reconstruction = model(data, sample_posterior=True).sample
             loss = F.mse_loss(reconstruction, data, reduction="mean")
             test_loss += loss.item()
 
-            recon = model.decode(model.encode(data).latent_dist.sample()).sample
+            #recon = model.decode(model.encode(data).latent_dist.sample()).sample
             wandb.log(
                 {
                     "original": [wandb.Image(img) for img in data],
-                    "reconstructed": [wandb.Image(img) for img in recon],
+                    "reconstructed": [wandb.Image(img) for img in reconstruction],
                 }
             )
         return test_loss / len(test_loader)
 
 
-def eval_model_mod(model: AutoencoderKL, data: torch.tensor) -> float:
+def eval_model_mod(model: AutoencoderKL, data: torch.tensor, report_to: str) -> float:
     model.eval()
     with torch.no_grad():
         """
@@ -179,12 +173,13 @@ def eval_model_mod(model: AutoencoderKL, data: torch.tensor) -> float:
         loss = F.mse_loss(reconstruction, data, reduction="mean")
 
         recon = model.decode(model.encode(data).latent_dist.sample()).sample
-        wandb.log(
-            {
-                "original": [wandb.Image(img) for img in data],
-                "reconstructed": [wandb.Image(img) for img in recon],
-            }
-        )
+        if report_to == "wandb":
+            wandb.log(
+                {
+                    "original": [wandb.Image(img) for img in data],
+                    "reconstructed": [wandb.Image(img) for img in recon],
+                }
+            )
         return loss.item()
 
 def collect_all_parquet_files(basepath):
@@ -199,7 +194,7 @@ def change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chun
     print("About to change/prepare dataset for dataloader")
     start = time.perf_counter()
     if chunk_id < plus_one_idx: samples_per_chunk += 1
-    paths = samples[chunk_id*samples_per_chunk:(chunk_id+1)*samples_per_chunk]
+    paths = parquet_paths[chunk_id*samples_per_chunk:(chunk_id+1)*samples_per_chunk]
     dataset = Dataset.from_parquet(paths)
     end = time.perf_counter()
     time_diff = end - start
@@ -213,7 +208,7 @@ def change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chun
 
 def update_chunk_id(chunk_id, num_chunks):
     chunk_id += 1
-    chunk_id %= num_chunk
+    chunk_id %= num_chunks
     return chunk_id
 
 def main():
@@ -243,7 +238,7 @@ def main():
     
     # Dataset Setup
     chunk_id = 0
-    dataloader = change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, batch_size, num_workers)
+    dataloader = change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, args.batch_size, args.num_workers)
 
     # Model Setup
     vae = AutoencoderKL.from_pretrained(PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae")
@@ -275,7 +270,7 @@ def main():
     
     break_while = False
     while True:
-        for batch in train_dataloader:
+        for batch in dataloader:
             model.train()
             data = batch["pixel_values"].to(device)
             optimizer.zero_grad()
@@ -285,7 +280,7 @@ def main():
             https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
             Don't know why. May change it later.
             """
-            reconstruction = model(data).sample
+            reconstruction = model(data, sample_posterior=True).sample
             loss = F.mse_loss(reconstruction, data, reduction="mean")
 
             loss.backward()
@@ -305,7 +300,7 @@ def main():
 
             if step % args.validation_steps == 0:
                 # Use only two samples for validation
-                val_loss = eval_model_mod(model, data[:2])
+                val_loss = eval_model_mod(model, data[:2], args.report_to)
                 # save model to hub
                 model.save_pretrained(
                     os.path.join(args.output_dir, "vae"),
@@ -317,7 +312,9 @@ def main():
             if step >= args.max_train_steps:
                 break_while = True
                 break
-            if step % args.chunk_id_interval == 0: chunk_id = update_chunk_id(chunk_id, num_chunks)
+            if step % args.chunk_id_interval == 0: 
+                chunk_id = update_chunk_id(chunk_id, args.num_chunks)
+                dataloader = change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, args.batch_size, args.num_workers)
         
         if break_while: break
 
