@@ -124,6 +124,12 @@ def parse_args():
         default=None,
         help="Hugging Face repo ID used when push_to_hub is True.",
     )
+    parser.add_argument(
+        "--hf_model_folder",
+        type=str,
+        default=None,
+        help="Hugging Face repo ID used when push_to_hub is True.",
+    )
     return parser.parse_args()
 
 
@@ -215,7 +221,6 @@ def main():
     args = parse_args()
     accelerator = Accelerator()
     if accelerator.is_main_process and args.report_to == "wandb":
-        import wandb
         wandb.init(
             project="gamengen-vae-training",
             config={
@@ -306,7 +311,7 @@ def main():
                     current_lr = scheduler.get_last_lr()[0]
                     log_dic["lr"] = current_lr
                 progress_bar.set_postfix(log_dic)
-                if args.report_to == "wandb": wandb.log(log_dic)
+                if accelerator.is_main_process and args.report_to == "wandb": wandb.log(log_dic)
 
                 progress_bar.update(1)
                 step += 1
