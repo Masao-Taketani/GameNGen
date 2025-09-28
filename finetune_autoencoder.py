@@ -7,6 +7,7 @@ import random
 import torch
 import torch.nn.functional as F
 from diffusers import AutoencoderKL
+from diffusers.image_processor import VaeImageProcessor
 from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -15,6 +16,8 @@ from datasets import Dataset
 import datasets
 import wandb
 from accelerate import Accelerator
+import numpy as np
+from PIL import Image
 
 from config_sd import PRETRAINED_MODEL_NAME_OR_PATH
 from dataset import preprocess_train
@@ -167,7 +170,14 @@ def eval_model(model: AutoencoderKL, test_loader: DataLoader) -> float:
         return test_loss / len(test_loader)
 
 
-def eval_model_mod(model: AutoencoderKL, data: torch.tensor, report_to: str) -> float:
+def postprocess(vae: AutoencoderKL, image_processor: VaeImageProcessor, image: torch.tensor) -> Image:
+    image = image_processor.postprocess(
+        image.detach().cpu().float(), output_type="pil", do_denormalize=[True] * image.shape[0]
+    )[0]
+    return image
+
+
+def eval_model_mod(model: AutoencoderKL, data: torch.tensor, report_to: str, vae_scale_factor: int) -> float:
     model.eval()
     with torch.no_grad():
         """
@@ -175,15 +185,17 @@ def eval_model_mod(model: AutoencoderKL, data: torch.tensor, report_to: str) -> 
         https://github.com/huggingface/diffusers/blob/c586aadef6bb66d355fa40a2b95a0bea8a6fe79c/src/diffusers/models/autoencoders/autoencoder_kl.py#L438
         Don't know why. May change it later.
         """
-        reconstruction = model(data).sample
+        #reconstruction = model(data).sample
+        reconstruction = model(data, sample_posterior=True).sample
         loss = F.mse_loss(reconstruction, data, reduction="mean")
 
-        recon = model.decode(model.encode(data).latent_dist.sample()).sample
+        #recon = model.decode(model.encode(data).latent_dist.sample()).sample
         if report_to == "wandb":
+            image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
             wandb.log(
                 {
-                    "original": [wandb.Image(img) for img in data],
-                    "reconstructed": [wandb.Image(img) for img in recon],
+                    "original": [wandb.Image(np.transpose(img, axes=(1, 2, 0))) for img in data.cpu().float().numpy()],
+                    "reconstructed": [wandb.Image(postprocess(model, image_processor, img.unsqueeze(0))) for img in reconstruction],
                 }
             )
         return loss.item()
@@ -250,6 +262,7 @@ def main():
 
     # Model Setup
     model = AutoencoderKL.from_pretrained(PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae")
+    vae_scale_factor = 2 ** (len(model.config.block_out_channels) - 1)
     make_decoder_trainable(model)
     # Optimizer Setup
     optimizer_cls = optim.AdamW if args.use_adamw else optim.Adafactor
@@ -318,7 +331,7 @@ def main():
 
                 if accelerator.is_main_process and step % args.validation_steps == 0:
                     # Use only two samples for validation
-                    val_loss = eval_model_mod(accelerator.unwrap_model(model), data[:2], args.report_to)
+                    val_loss = eval_model_mod(accelerator.unwrap_model(model), data[:2], args.report_to, vae_scale_factor)
                     # save model to hub
                     accelerator.unwrap_model(model).save_pretrained(
                         os.path.join(args.output_dir, "vae"),
@@ -335,6 +348,19 @@ def main():
                     dataloader = change_chunk_id_for_dataloader(plus_one_idx, parquet_paths, samples_per_chunk, chunk_id, args.batch_size, args.num_workers)
         
         if break_while: break
+
+    if accelerator.is_main_process:
+        accelerator.unwrap_model(model).save_pretrained(
+                        os.path.join(args.output_dir, "vae"),
+                        repo_id=args.repo_id if args.push_to_hub else None,
+                        push_to_hub=args.push_to_hub,
+                    )
+
+    accelerator.end_training()
+
+    # At the end of your script
+    if accelerator.is_main_process and args.report_to == "wandb":
+        wandb.finish()
 
 
 if __name__ == "__main__":
