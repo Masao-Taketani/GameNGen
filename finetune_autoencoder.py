@@ -36,6 +36,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--wandb_name",
+        type=str,
+        default=None,
+        help=(
+            'Only used when `report_to` is set to `wandb`'
+        ),
+    )
+    parser.add_argument(
         "--dataset_basepath",
         type=str,
         help=(
@@ -45,7 +53,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="sd-model-finetuned",
+        default="decoder-finetuned",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
@@ -235,6 +243,7 @@ def main():
     if accelerator.is_main_process and args.report_to == "wandb":
         wandb.init(
             project="gamengen-vae-training",
+            name=args.wandb_name,
             config={
                 # Model parameters
                 "model": PRETRAINED_MODEL_NAME_OR_PATH,
@@ -246,7 +255,6 @@ def main():
                 "gradient_clip_norm": args.gradient_clipping,
                 "hf_model_folder": args.hf_model_folder,
             },
-            name=f"vae-finetuning-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
         )
 
     device = accelerator.device
