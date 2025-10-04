@@ -1,0 +1,13 @@
+accelerate launch --multi_gpu train_with_latents.py \
+	--dataset_basepath {input your dataset folder path here} \
+	--train_batch_size 112 \
+	--use_adamw \
+   	--learning_rate 5e-5 \
+   	--max_train_steps 700000 \
+   	--validation_steps 1000 \
+   	--dataloader_num_workers 32 \
+	--use_cfg \
+	--output_dir {input your output folder path here} \
+    --lr_scheduler cosine \
+    --report_to wandb \
+    --wandb_name {input your wandb name here}
