@@ -57,6 +57,7 @@ from model import get_model, save_and_maybe_upload_to_hub
 from run_inference import run_inference_latent_conditioning_with_params
 from utils import add_conditioning_noise, get_conditioning_noise
 from data_augmentation import no_latent_img_conditioning_augmentation
+from data_augmentation import no_latent_img_conditioning_augmentation_with_black_latents
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 # check_min_version("0.31.0.dev0")
@@ -464,6 +465,12 @@ def parse_args():
         help="Whether or not to use classifier free guidance.",
     )
     parser.add_argument(
+        "--which_cond",
+        type=str,
+        default="zero",
+        help="Which conditioning to to use. Choose either 'zero' or 'black'.",
+    )
+    parser.add_argument(
         "--load_pretrained",
         type=str,
         default=None,
@@ -712,6 +719,9 @@ def main():
     # Scheduler and math around the number of training steps.
     # Check the PR https://github.com/huggingface/diffusers/pull/8312 for detailed explanation.
     num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
+    num_training_steps_for_scheduler = (
+            args.max_train_steps * accelerator.num_processes
+        )
 
     if args.lr_scheduler == "constant":
         num_warmup_steps_for_scheduler, num_training_steps_for_scheduler, lr_warmup_steps = None, None, None
@@ -812,7 +822,15 @@ def main():
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             # Drop conditional latent images with a specified probability for CFG
-            batch["latent_values"] = no_latent_img_conditioning_augmentation(batch["latent_values"], prob=ZERO_OUT_ACTION_CONDITIONING_PROB)
+            if args.which_cond == "zero":
+                batch["latent_values"] = no_latent_img_conditioning_augmentation(batch["latent_values"], prob=ZERO_OUT_ACTION_CONDITIONING_PROB)
+            elif args.which_cond == "black":
+                batch["latent_values"] = no_latent_img_conditioning_augmentation_with_black_latents(batch["latent_values"], 
+                                                                                                    args.dataset_basepath,
+                                                                                                    prob=ZERO_OUT_ACTION_CONDITIONING_PROB)
+            else:
+                raise ValueError(f"choose proper conditioning, 'zero' or 'black'. What you input: {args.which_cond}")
+
             with accelerator.accumulate(comb_train_model):
                 if args.skip_image_conditioning:
                     latents = batch["latent_values"].to(dtype=weight_dtype) * vae.config.scaling_factor
@@ -989,6 +1007,17 @@ def main():
                 if accelerator.sync_gradients:
                     params_to_clip = trainable_params
                     accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
+
+                #accelerator.wait_for_everyone() # Ensure all processes are at the same point
+                #if accelerator.is_main_process:
+                #    total_norm = 0
+                #    for p in comb_train_model.parameters():
+                #        if p.grad is not None:
+                #            param_norm = p.grad.data.norm(2)
+                #            total_norm += param_norm.item() ** 2
+                #    total_norm = total_norm ** 0.5
+                #    print(f"Gradient norm: {total_norm}")
+
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
