@@ -1,0 +1,13 @@
+python train_with_latents.py \
+    --dataset_basepath {input your dataset folder path here} \
+    --use_adamw \
+    --learning_rate 5e-5 \
+    --train_batch_size 112 \
+    --dataloader_num_workers 32 \
+    --max_train_steps 700000 \
+    --validation_steps 1000 \
+    --use_cfg \
+    --output_dir {input your output folder path here} \
+    --lr_scheduler cosine \
+    --report_to wandb \
+    --wandb_name {input your wandb name here}
