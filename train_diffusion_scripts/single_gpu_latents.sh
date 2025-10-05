@@ -1,5 +1,5 @@
 python train_with_latents.py \
-    --dataset_basepath {input your dataset folder path here} \
+    --dataset_basepath {input your pt dataset folder path here} \
     --use_adamw \
     --learning_rate 5e-5 \
     --train_batch_size 112 \

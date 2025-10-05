@@ -1,5 +1,5 @@
 accelerate launch --multi_gpu train_with_latents.py \
-	--dataset_basepath {input your dataset folder path here} \
+	--dataset_basepath {input your pt dataset folder path here} \
 	--train_batch_size 112 \
 	--use_adamw \
    	--learning_rate 5e-5 \
