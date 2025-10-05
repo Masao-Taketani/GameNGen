@@ -38,18 +38,18 @@ class CombinedTrainModel(ModelMixin):
                          )[0]
 
 
-def get_ft_vae_decoder(use_orig_vae=True) -> AutoencoderKL:
+def get_vae(model_folder_or_id: str | None = None) -> AutoencoderKL:
     """
     Based on the original GameNGen code, the vae decoder is finetuned on images from the
     training set to improve the quality of the images.
     """ 
     
-    if use_orig_vae:
+    if model_folder_or_id is None:
         return AutoencoderKL.from_pretrained(
                     PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae"
                 )
     else:
-        return AutoencoderKL.from_pretrained("arnaudstiegler/game-n-gen-vae-finetuned")
+        return AutoencoderKL.from_pretrained(model_folder_or_id)
 
 def get_model(
     action_embedding_dim: int, skip_image_conditioning: bool = False
@@ -78,7 +78,7 @@ def get_model(
     # This is what the paper uses
     noise_scheduler.register_to_config(prediction_type="v_prediction")
 
-    vae = get_ft_vae_decoder()
+    vae = get_vae()
 
     unet = UNet2DConditionModel.from_pretrained(
         PRETRAINED_MODEL_NAME_OR_PATH, subfolder="unet"
@@ -152,7 +152,7 @@ def load_action_embedding(
 
 
 def load_model(
-    model_folder: str, device: torch.device | None = None
+    unet_model_folder: str, vae_model_folder: str, device: torch.device | None = None
 ) -> tuple[
     UNet2DConditionModel,
     AutoencoderKL,
@@ -165,20 +165,22 @@ def load_model(
     Load a model from the hub
 
     Args:
-        model_folder: the folder to load the model from, can be a model id or a local folder
+        unet_model_folder: the folder to load the non-vae models and configs from, can be a model id or a local folder
+        vae_model_folder: the folder to load the vae model from, can be a model id or a local folder.
+                          If None, use the 'arnaudstiegler/game-n-gen-vae-finetuned' is used.
     """
-    embedding_info = load_embedding_info_dict(model_folder)
+    embedding_info = load_embedding_info_dict(unet_model_folder)
     action_embedding = load_action_embedding(
-        model_folder=model_folder,
+        model_folder=unet_model_folder,
         action_num_embeddings=embedding_info["num_embeddings"],
     )
 
     noise_scheduler = DDIMScheduler.from_pretrained(
-        model_folder, subfolder="noise_scheduler"
+        unet_model_folder, subfolder="noise_scheduler"
     )
 
-    vae = get_ft_vae_decoder()
-    unet = UNet2DConditionModel.from_pretrained(model_folder, subfolder="unet")
+    vae = get_vae(vae_model_folder) if vae_model_folder else get_vae("arnaudstiegler/game-n-gen-vae-finetuned")
+    unet = UNet2DConditionModel.from_pretrained(unet_model_folder, subfolder="unet")
 
     assert (
         noise_scheduler.config.prediction_type == "v_prediction"
@@ -186,22 +188,13 @@ def load_model(
     assert (
         unet.config.num_class_embeds == NUM_BUCKETS
     ), f"UNet num_class_embeds should be {NUM_BUCKETS}"
-
-    # Unaltered
-    tokenizer = CLIPTokenizer.from_pretrained(
-        PRETRAINED_MODEL_NAME_OR_PATH, subfolder="tokenizer"
-    )
-    text_encoder = CLIPTextModel.from_pretrained(
-        PRETRAINED_MODEL_NAME_OR_PATH, subfolder="text_encoder"
-    )
     
     if device:
         unet = unet.to(device)
         vae = vae.to(device)
         action_embedding = action_embedding.to(device)
-        text_encoder = text_encoder.to(device)
     
-    return unet, vae, action_embedding, noise_scheduler, tokenizer, text_encoder
+    return unet, vae, action_embedding, noise_scheduler
 
 
 def save_model(
