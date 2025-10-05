@@ -111,6 +111,12 @@ def parse_args():
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument(
+        "--lr_warmup_steps",
+        type=int,
+        default=500,
+        help="Number of steps for the warmup in the lr scheduler.",
+    )
+    parser.add_argument(
         "--lr_scheduler",
         type=str,
         default="constant",
@@ -281,8 +287,8 @@ def main():
     if args.lr_scheduler == "cosine_with_warmup":
         scheduler = get_cosine_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=NUM_WARMUP_STEPS,
-            num_training_steps=NUM_EPOCHS * len(train_loader),
+            num_warmup_steps= args.lr_warmup_steps * accelerator.num_processes,
+            num_training_steps=args.max_train_steps * accelerator.num_processes,
         )
         dataloader, model, optimizer, scheduler = accelerator.prepare(
             dataloader, model, optimizer, scheduler
