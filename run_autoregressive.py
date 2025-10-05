@@ -8,7 +8,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, TRAINING_DATASET_DICT
-from dataset import EpisodeDataset, collate_fn
+from dataset import EpisodeDatasetLatent, collate_fn
 from run_inference import (
     decode_and_postprocess,
     encode_conditioning_frames,
@@ -28,11 +28,10 @@ Built action space of size 18 from buttons [
 """
 
 
-torch.manual_seed(9052924)
-np.random.seed(9052924)
-random.seed(9052924)
-
-EPISODE_LENGTH = 300
+def set_seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def generate_rollout(
@@ -90,7 +89,8 @@ def generate_rollout(
     return all_images
 
 
-def main(unet_model_folder: str, vae_model_folder: str) -> None:
+def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
+         vae_model_folder: str, action_dim: int) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -99,9 +99,9 @@ def main(unet_model_folder: str, vae_model_folder: str) -> None:
         else "cpu"
     )
 
-    dataset = EpisodeDataset(TRAINING_DATASET_DICT["small"])
+    dataset = EpisodeDatasetLatent(basepath, action_dim)
     start_indices = [
-        random.randint(0, len(dataset) - EPISODE_LENGTH) for _ in range(20)
+        random.randint(0, len(dataset) - episode_length) for _ in range(num_episodes)
     ]
 
     for start_idx in start_indices:
@@ -110,7 +110,7 @@ def main(unet_model_folder: str, vae_model_folder: str) -> None:
         actions = [
             dataset[i]["input_ids"][-1].item()
             for i in range(
-                start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + EPISODE_LENGTH
+                start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + episode_length
             )
         ]
 
@@ -130,7 +130,7 @@ def main(unet_model_folder: str, vae_model_folder: str) -> None:
         )
 
         # Store all generated latents - split context frames into individual tensors
-        initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 30, 40]
+        initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 32, 40]
         initial_action_context = batch["input_ids"].squeeze(0)[:BUFFER_SIZE].to(device)
 
         all_images = generate_rollout(
@@ -158,6 +158,29 @@ if __name__ == "__main__":
         description="Run inference with customizable parameters"
     )
     parser.add_argument(
+        "--dataset_basepath",
+        type=str,
+        help=(
+            "The latent dataset base path pointing a folder containing pt files."
+        ),
+    )
+    parser.add_argument(
+        "--num_episodes",
+        type=int,
+        default=20,
+        help=(
+            "The number of episodes to generate."
+        ),
+    )
+    parser.add_argument(
+        "--episode_length",
+        type=int,
+        default=300,
+        help=(
+            "The number of frames to generate per episode."
+        ),
+    )
+    parser.add_argument(
         "--unet_model_folder",
         type=str,
         help="Path to the folder containing the trained Unet model weights",
@@ -169,6 +192,29 @@ if __name__ == "__main__":
         help="Path to the folder containing the finetuned VAE model weights. "
              "If None, use the 'arnaudstiegler/game-n-gen-vae-finetuned' is used.",
     )
+    parser.add_argument(
+        "--action_dim",
+        type=int,
+        default=18,
+        help=(
+            "The number of action dim the RL agent has trained with."
+        ),
+    )
+    parser.add_argument(
+        "--action_dim",
+        type=int,
+        default=18,
+        help=(
+            "The number of action dim the RL agent has trained with."
+        ),
+    )
+    parser.add_argument(
+        "--seed", 
+        type=int, 
+        default=9052924, 
+        help="A seed for reproducible inference."
+    )
     args = parser.parse_args()
-
-    main(model_folder=args.model_folder)
+    set_seed(args.seed)
+    main(args.dataset_basepath, args.num_episodes, args.episode_length, args.unet_model_folder, 
+         args.vae_ft_model_folder, args.action_dim)
