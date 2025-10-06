@@ -7,7 +7,7 @@ from diffusers.image_processor import VaeImageProcessor
 from PIL import Image
 from tqdm import tqdm
 
-from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, TRAINING_DATASET_DICT
+from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
 from dataset import EpisodeDatasetLatent, collate_fn
 from run_inference import (
     decode_and_postprocess,
@@ -53,16 +53,15 @@ def generate_rollout(
         # Generate next frame latents
         target_latents = next_latent(
             unet=unet,
-            vae=vae,
             noise_scheduler=noise_scheduler,
             action_embedding=action_embedding,
             context_latents=context_latents.unsqueeze(0),
             device=device,
-            skip_action_conditioning=False,
-            do_classifier_free_guidance=False,
-            guidance_scale=CFG_GUIDANCE_SCALE,
-            num_inference_steps=50,
             actions=current_actions.unsqueeze(0),
+            skip_action_conditioning=False,
+            num_inference_steps=DEFAULT_NUM_INFERENCE_STEPS,
+            do_classifier_free_guidance=True,
+            guidance_scale=CFG_GUIDANCE_SCALE,
         )
         all_latents.append(target_latents)
         current_actions = torch.cat(
@@ -81,16 +80,17 @@ def generate_rollout(
     # Decode all latents to images
     all_images = []
     for latent in all_latents:  # Skip the initial context frames
-        all_images.append(
-            decode_and_postprocess(
-                vae=vae, image_processor=image_processor, latents=latent
+        with torch.inference_mode():
+            all_images.append(
+                decode_and_postprocess(
+                    vae=vae, image_processor=image_processor, latents=latent
+                )
             )
-        )
     return all_images
 
 
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, action_dim: int) -> None:
+         vae_model_folder: str, action_dim: int, start_from_latents: bool) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -105,29 +105,33 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
     ]
 
     for start_idx in start_indices:
-        # Collate to get the right tensor dims
-        batch = collate_fn([dataset[start_idx]])
-        actions = [
-            dataset[i]["input_ids"][-1].item()
-            for i in range(
-                start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + episode_length
+        if start_from_latents:
+            # TODO
+        else:
+            # Collate to get the right tensor dims
+            batch = collate_fn([dataset[start_idx]])
+            actions = [
+                dataset[i]["input_ids"][-1].item()
+                for i in range(
+                    start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + episode_length
+                )
+            ]
+
+            unet, vae, action_embedding, noise_scheduler = load_model(
+                unet_model_folder, vae_model_folder, device=device
             )
-        ]
 
-        unet, vae, action_embedding, noise_scheduler = load_model(
-            unet_model_folder, vae_model_folder, device=device
-        )
+            vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+            image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
-        vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
-        image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
-
-        # Encode initial context frames
-        context_latents = encode_conditioning_frames(
-            vae,
-            images=batch["pixel_values"],
-            vae_scale_factor=vae_scale_factor,
-            dtype=torch.float32,
-        )
+            # Encode initial context frames
+            with torch.inference_mode():
+                context_latents = encode_conditioning_frames(
+                    vae,
+                    images=batch["pixel_values"],
+                    vae_scale_factor=vae_scale_factor,
+                    dtype=torch.float32,
+                )
 
         # Store all generated latents - split context frames into individual tensors
         initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 32, 40]
@@ -156,6 +160,14 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run inference with customizable parameters"
+    )
+    parser.add_argument(
+        "--start_from_pixels",
+        action="store_true",
+        help=(
+            "The inference starts with pixels if True. Otherwise, it starts with "
+            "latents to save calculation resources.",
+        ),
     )
     parser.add_argument(
         "--dataset_basepath",
@@ -215,6 +227,8 @@ if __name__ == "__main__":
         help="A seed for reproducible inference."
     )
     args = parser.parse_args()
+    start_from_latents = False if args.start_from_pixels else True
     set_seed(args.seed)
-    main(args.dataset_basepath, args.num_episodes, args.episode_length, args.unet_model_folder, 
-         args.vae_ft_model_folder, args.action_dim)
+    main(args.dataset_basepath, args.num_episodes, args.episode_length, 
+         args.unet_model_folder, args.vae_ft_model_folder, args.action_dim,
+         start_from_latents)
