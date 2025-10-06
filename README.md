@@ -4,7 +4,12 @@ This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I ha
 
 ## Modifications
 Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main).
-- Fixed the environment setup with Anaconda and write down the precise commands in order to properly reproduce the code (For this development, I start from `continuumio/anaconda3:latest` Docker image).
+- Fixed the environment setup with Anaconda and write down the precise commands in order to properly reproduce the code (For this development, I start from `continuumio/anaconda3:latest` Docker image). Thus, to precisely replicate the dev environment, set up the Docker environment with the following command.
+```
+cd GameNGen
+docker run --log-opt max-size=10m --log-opt max-file=2 -it --rm --gpus '"device={input your GPU device ID(s) here}"' -v .:/work continuumio/anaconda3:latest
+```
+I strongly recommend using `--log-opt max-size` option since the RL training script for ViZDoom outputs lots of logs to stdout, which conssumes excessive disk space.
 - Use the original paper's training setup as much as I can
 - Incorporate much more efficient diffusion training method and data files
 
