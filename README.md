@@ -22,9 +22,9 @@ I strongly recommend using `--log-opt max-size` option since the RL training scr
   - [x] Add `MOVE_BACKWARD` action
   - [x] Enable to collect VizDoom dataset with multiprocessing during RL policy training
   - **Diffusion Models**
-  - [] Use 4 for the number of inference steps for training evaluation and autoregressive inference
-  ~~- [x] 2e-5 for the learning rate~~
-  ~~- [x] Adafactor optimizer~~
+  - [] Use 4 for the number of inference steps for training evaluation and autoregressive inference<br>
+  ~~- [x] 2e-5 for the learning rate~~<br>
+  ~~- [x] Adafactor optimizer~~<br>
   (I've tried the above two, but got worse results compared to the settings used for [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main). So, I didn't use those at the end)
   - [x] A context length of 64
   - [x] Train iteratively with respect to steps, not epochs<br>
