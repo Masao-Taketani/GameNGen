@@ -22,14 +22,16 @@ I strongly recommend using `--log-opt max-size` option since the RL training scr
   - [x] Add `MOVE_BACKWARD` action
   - [x] Enable to collect VizDoom dataset with multiprocessing during RL policy training
   - **Diffusion Models**
-  - [x] 2e-5 for the learning rate
-  - [x] Adafactor optimizer
+  - [] Use 4 for the number of inference steps for training evaluation and autoregressive inference
+  ~~- [x] 2e-5 for the learning rate~~
+  ~~- [x] Adafactor optimizer~~
+  (I've tried the above two, but got worse results compared to the settings used for [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main). So, I didn't use those at the end)
   - [x] A context length of 64
   - [x] Train iteratively with respect to steps, not epochs<br>
   ~~- [ ] Set action embedding as `trainable_params`~~
   - [x] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters with multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668)
   - [x] Pad every image frame to get 320x256 from 320x240
-  - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes for each batch
+  - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes when creating each training sample
 - [x] Efficient Diffusion Training
   - [x] Convert image dataset into latent embedding one and train only using the embeddings from the beginning, not handling image dataset at all during the training
   - [x] Convert dataset file format from `.parquet` (for images & actions) to `.pt` (for latent embeddings & actions) to directly handle Torch tensors to train
