@@ -1,14 +1,14 @@
 import argparse
 import random
-
 import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
 from PIL import Image
 from tqdm import tqdm
+import os
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
-from dataset import EpisodeDatasetLatent, collate_fn
+from dataset import EpisodeDatasetLatent, EpisodeDatasetMod, collate_fn
 from run_inference import (
     decode_and_postprocess,
     encode_conditioning_frames,
@@ -89,6 +89,22 @@ def generate_rollout(
     return all_images
 
 
+def get_epi_files(basepath, file_format="pt"):
+    samples = []
+    for dirpath, dirnames, filenames in os.walk(basepath):
+        for filename in filenames:
+            if filename.split(".")[-1] == file_format:
+                if file_format == "pt" and filename != "latent_black.pt": 
+                    samples.append(os.path.join(dirpath, filename))
+                else:
+                    samples.append(os.path.join(dirpath, filename))
+    return samples
+
+
+def load_pt(fpath):
+    # TODO
+
+
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
          vae_model_folder: str, action_dim: int, start_from_latents: bool) -> None:
     device = torch.device(
@@ -99,16 +115,29 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         else "cpu"
     )
 
-    dataset = EpisodeDatasetLatent(basepath, action_dim)
-    start_indices = [
+    epi_indices = [
         random.randint(0, len(dataset) - episode_length) for _ in range(num_episodes)
     ]
 
-    for start_idx in start_indices:
+    unet, vae, action_embedding, noise_scheduler = load_model(
+        unet_model_folder, vae_model_folder, device=device
+    )
+
+    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+
+    for epi_idx in epi_indices:
+        
+        epi_data = dataset[epi_idx]
         if start_from_latents:
-            # TODO
+            data_fpaths = get_epi_files(basepath, file_format="pt")
+            epi_idx = random.randint(0, len(data_fpaths) - episode_length)
+            data = load_pt(fpath)
+            total_length = 
+            start_idx = random.randint(0, len(total_length) - episode_length)
+            initial_frame_context = dataset[epi_idx][:BUFFER_SIZE]
         else:
-            # Collate to get the right tensor dims
+            # Haven't tested this part yet
             batch = collate_fn([dataset[start_idx]])
             actions = [
                 dataset[i]["input_ids"][-1].item()
@@ -116,13 +145,6 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
                     start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + episode_length
                 )
             ]
-
-            unet, vae, action_embedding, noise_scheduler = load_model(
-                unet_model_folder, vae_model_folder, device=device
-            )
-
-            vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
-            image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
             # Encode initial context frames
             with torch.inference_mode():
@@ -133,9 +155,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
                     dtype=torch.float32,
                 )
 
-        # Store all generated latents - split context frames into individual tensors
-        initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 32, 40]
-        initial_action_context = batch["input_ids"].squeeze(0)[:BUFFER_SIZE].to(device)
+            # Store all generated latents - split context frames into individual tensors
+            initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 32, 40]
+            initial_action_context = batch["input_ids"].squeeze(0)[:BUFFER_SIZE].to(device)
 
         all_images = generate_rollout(
             unet=unet,
@@ -149,7 +171,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         )
 
         all_images[0].save(
-            f"rollouts/rollout_{start_idx}.gif",
+            f"rollouts/rollout_{iter_id}.gif",
             save_all=True,
             append_images=all_images[1:],
             duration=100,  # 100ms per frame
