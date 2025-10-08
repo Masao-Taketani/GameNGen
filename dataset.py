@@ -141,8 +141,37 @@ class EpisodeDatasetLatent:
         return {'latent_values': latents, 'input_ids': actions}
 
 
-class EpisodeDatasetMod:
+class EpisodeDatasetDecoderFT:
     def __init__(self, basepath: str, action_dim: int):
+        self.action_dim = action_dim
+        self.samples = []
+        for dirpath, dirnames, filenames in os.walk(basepath):
+            for filename in filenames:
+                if filename.split(".")[-1] == "parquet": self.samples.append(os.path.join(dirpath, filename))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        path = self.samples[idx]
+        dataset = Dataset.from_parquet(path)
+        length = len(dataset)
+        images = [
+            IMG_TRANSFORMS(Image.open(io.BytesIO(img)).convert("RGB"))
+            for img in dataset["frames"]
+        ]
+
+        # Since each data includes the buffer and label, the start has to be at least 1
+        # and the last index has to be length - 1
+        start_ep_idx = random.randint(1, length-1)
+        if start_ep_idx < BUFFER_SIZE:
+            padding = [IMG_TRANSFORMS(Image.new('RGB', (WIDTH, HEIGHT), color='black')) for _ in range(BUFFER_SIZE - start_ep_idx)]
+            return {'pixel_values': padding + images[:start_ep_idx+1], 'input_ids': torch.concat([torch.zeros(len(padding), dtype=torch.long), actions[:start_ep_idx+1]])}
+        return {'pixel_values': images[start_ep_idx-BUFFER_SIZE:start_ep_idx+1], 'input_ids': actions[start_ep_idx-BUFFER_SIZE:start_ep_idx+1]}
+
+
+class EpisodeDatasetMod:
+    def __init__(self, basepath: str, action_dim: int | None = None):
         self.action_dim = action_dim
         self.samples = []
         for dirpath, dirnames, filenames in os.walk(basepath):

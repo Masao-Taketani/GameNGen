@@ -6,6 +6,7 @@ from diffusers.image_processor import VaeImageProcessor
 from PIL import Image
 from tqdm import tqdm
 import os
+import random
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
 from dataset import EpisodeDatasetLatent, EpisodeDatasetMod, collate_fn
@@ -28,7 +29,7 @@ Built action space of size 18 from buttons [
 """
 
 
-def set_seed(seed)
+def set_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -102,11 +103,11 @@ def get_epi_files(basepath, file_format="pt"):
 
 
 def load_pt(fpath):
-    # TODO
+    return torch.load(fpath)
 
 
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, action_dim: int, start_from_latents: bool) -> None:
+         vae_model_folder: str, start_from_latents: bool) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -115,9 +116,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         else "cpu"
     )
 
-    epi_indices = [
-        random.randint(0, len(dataset) - episode_length) for _ in range(num_episodes)
-    ]
+    dataset = get_epi_files(basepath, file_format="pt") if start_from_latents else EpisodeDatasetMod(basepath)
+    ds_length = len(dataset)
+    epi_indices = random.sample(range(ds_length), num_episodes)
 
     unet, vae, action_embedding, noise_scheduler = load_model(
         unet_model_folder, vae_model_folder, device=device
@@ -128,12 +129,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
 
     for epi_idx in epi_indices:
         
-        epi_data = dataset[epi_idx]
+        episode = dataset[epi_idx]
         if start_from_latents:
-            data_fpaths = get_epi_files(basepath, file_format="pt")
-            epi_idx = random.randint(0, len(data_fpaths) - 1)
-            fpath = data_fpaths[epi_idx]
-            data = load_pt(fpath)
+            data = load_pt(episode)
             total_length = len(data["actions"])
             start_idx = random.randint(0, len(total_length) - episode_length - BUFFER_SIZE)
             initial_frame_context = data["parameters"][start_idx:start_idx+BUFFER_SIZE].to(device)
@@ -238,14 +236,6 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
-        "--action_dim",
-        type=int,
-        default=18,
-        help=(
-            "The number of action dim the RL agent has trained with."
-        ),
-    )
-    parser.add_argument(
         "--seed", 
         type=int, 
         default=9052924, 
@@ -255,5 +245,4 @@ if __name__ == "__main__":
     start_from_latents = False if args.start_from_pixels else True
     set_seed(args.seed)
     main(args.dataset_basepath, args.num_episodes, args.episode_length, 
-         args.unet_model_folder, args.vae_ft_model_folder, args.action_dim,
-         start_from_latents)
+         args.unet_model_folder, args.vae_ft_model_folder, start_from_latents)
