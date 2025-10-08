@@ -131,11 +131,14 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         epi_data = dataset[epi_idx]
         if start_from_latents:
             data_fpaths = get_epi_files(basepath, file_format="pt")
-            epi_idx = random.randint(0, len(data_fpaths) - episode_length)
+            epi_idx = random.randint(0, len(data_fpaths) - 1)
+            fpath = data_fpaths[epi_idx]
             data = load_pt(fpath)
-            total_length = 
-            start_idx = random.randint(0, len(total_length) - episode_length)
-            initial_frame_context = dataset[epi_idx][:BUFFER_SIZE]
+            total_length = len(data["actions"])
+            start_idx = random.randint(0, len(total_length) - episode_length - BUFFER_SIZE)
+            initial_frame_context = data["parameters"][start_idx:start_idx+BUFFER_SIZE].to(device)
+            initial_action_context = data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
+            actions = data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
         else:
             # Haven't tested this part yet
             batch = collate_fn([dataset[start_idx]])
