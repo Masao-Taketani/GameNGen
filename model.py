@@ -49,7 +49,7 @@ def get_vae(model_folder_or_id: str | None = None) -> AutoencoderKL:
                     PRETRAINED_MODEL_NAME_OR_PATH, subfolder="vae"
                 )
     else:
-        return AutoencoderKL.from_pretrained(model_folder_or_id)
+        return AutoencoderKL.from_pretrained(model_folder_or_id, subfolder="vae")
 
 def get_model(
     action_embedding_dim: int, skip_image_conditioning: bool = False
@@ -152,7 +152,7 @@ def load_action_embedding(
 
 
 def load_model(
-    unet_model_folder: str, vae_model_folder: str, device: torch.device | None = None
+    unet_model_folder: str, vae_model_folder: str | None = None, device: torch.device | None = None
 ) -> tuple[
     UNet2DConditionModel,
     AutoencoderKL,

@@ -3,6 +3,7 @@ import random
 import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
+from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
 from PIL import Image
 from tqdm import tqdm
 import os
@@ -14,6 +15,7 @@ from run_inference import (
     decode_and_postprocess,
     encode_conditioning_frames,
     next_latent,
+    prepare_conditioning_frames,
 )
 from model import load_model
 
@@ -51,6 +53,14 @@ def generate_rollout(
     context_latents = initial_frame_context
 
     for i in tqdm(range(len(actions))):
+        print("context_latents", context_latents.shape)
+        context_latents = prepare_conditioning_frames(
+            vae,
+            latents=context_latents,
+            device=unet.device,
+            dtype=context_latents.dtype,
+        )
+        print("context_latents", context_latents.shape)
         # Generate next frame latents
         target_latents = next_latent(
             unet=unet,
@@ -132,9 +142,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         episode = dataset[epi_idx]
         if start_from_latents:
             data = load_pt(episode)
-            total_length = len(data["actions"])
-            start_idx = random.randint(0, len(total_length) - episode_length - BUFFER_SIZE)
-            initial_frame_context = data["parameters"][start_idx:start_idx+BUFFER_SIZE].to(device)
+            start_idx = random.randint(0, len(data["actions"]) - episode_length - BUFFER_SIZE)
+            parameters = data["parameters"][start_idx:start_idx+BUFFER_SIZE]
+            initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
             initial_action_context = data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
             actions = data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
         else:
