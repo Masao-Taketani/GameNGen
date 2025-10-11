@@ -51,17 +51,7 @@ def encode_conditioning_frames(
 def prepare_conditioning_frames(
     vae: AutoencoderKL, latents: torch.Tensor, device: torch.device, dtype: torch.dtype
 ) -> torch.Tensor:
-    batch_size, _, channels, height, width = latents.shape
     conditioning_frame_latents = latents[:, :BUFFER_SIZE].to(device=device, dtype=dtype) * vae.config.scaling_factor
-
-    # Reshape context latents
-    #conditioning_frame_latents = conditioning_frame_latents.reshape(
-    #    batch_size,
-    #    BUFFER_SIZE,
-    #    vae.config.latent_channels,
-    #    height,
-    #    width,
-    #)
     return conditioning_frame_latents
 
 

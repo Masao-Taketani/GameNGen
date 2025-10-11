@@ -46,6 +46,7 @@ def generate_rollout(
     actions: list[int],
     initial_frame_context: torch.Tensor,
     initial_action_context: torch.Tensor,
+    num_inference_steps: int
 ) -> list[Image]:
     device = unet.device
     all_latents = []
@@ -53,14 +54,12 @@ def generate_rollout(
     context_latents = initial_frame_context
 
     for i in tqdm(range(len(actions))):
-        print("context_latents", context_latents.shape)
         context_latents = prepare_conditioning_frames(
             vae,
             latents=context_latents,
             device=unet.device,
             dtype=context_latents.dtype,
         )
-        print("context_latents", context_latents.shape)
         # Generate next frame latents
         target_latents = next_latent(
             unet=unet,
@@ -70,7 +69,7 @@ def generate_rollout(
             device=device,
             actions=current_actions.unsqueeze(0),
             skip_action_conditioning=False,
-            num_inference_steps=DEFAULT_NUM_INFERENCE_STEPS,
+            num_inference_steps=num_inference_steps,
             do_classifier_free_guidance=True,
             guidance_scale=CFG_GUIDANCE_SCALE,
         )
@@ -117,7 +116,7 @@ def load_pt(fpath):
 
 
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, start_from_latents: bool) -> None:
+         vae_model_folder: str, start_from_latents: bool, num_inference_steps: int, outdir: str) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -179,14 +178,16 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             actions=actions,
             initial_frame_context=initial_frame_context,
             initial_action_context=initial_action_context,
+            num_inference_steps=num_inference_steps,
         )
 
+        os.makedirs(outdir, exist_ok=True)
         all_images[0].save(
-            f"rollouts/rollout_{iter_id}.gif",
+            os.path.join(outdir, f"rollout_{epi_idx}.gif"),
             save_all=True,
             append_images=all_images[1:],
-            duration=100,  # 100ms per frame
-            loop=0,
+            duration=300,  # 100ms per frame
+            loop=1,
         )
 
 
@@ -207,6 +208,23 @@ if __name__ == "__main__":
         type=str,
         help=(
             "The latent dataset base path pointing a folder containing pt files."
+        ),
+    )
+    parser.add_argument(
+        "--gif_outdir",
+        type=str,
+        default="rollouts",
+        help=(
+            "The GIF output dir."
+        ),
+    )
+    
+    parser.add_argument(
+        "--num_inference_steps",
+        type=int,
+        default=4,
+        help=(
+            "The number of inference steps to generate for each frame."
         ),
     )
     parser.add_argument(
@@ -255,4 +273,5 @@ if __name__ == "__main__":
     start_from_latents = False if args.start_from_pixels else True
     set_seed(args.seed)
     main(args.dataset_basepath, args.num_episodes, args.episode_length, 
-         args.unet_model_folder, args.vae_ft_model_folder, start_from_latents)
+         args.unet_model_folder, args.vae_ft_model_folder, start_from_latents,
+         args.num_inference_steps, args.gif_outdir)
