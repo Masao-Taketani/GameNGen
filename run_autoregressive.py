@@ -10,7 +10,7 @@ import os
 import random
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
-from dataset import EpisodeDatasetLatent, EpisodeDatasetMod, collate_fn
+from dataset import EpisodeDatasetLatent, EpisodeDatasetMod, collate_fn_wo_uncond
 from run_inference import (
     decode_and_postprocess,
     encode_conditioning_frames,
@@ -54,12 +54,6 @@ def generate_rollout(
     context_latents = initial_frame_context
 
     for i in tqdm(range(len(actions))):
-        context_latents = prepare_conditioning_frames(
-            vae,
-            latents=context_latents,
-            device=unet.device,
-            dtype=context_latents.dtype,
-        )
         # Generate next frame latents
         target_latents = next_latent(
             unet=unet,
@@ -125,7 +119,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         else "cpu"
     )
 
-    dataset = get_epi_files(basepath, file_format="pt") if start_from_latents else EpisodeDatasetMod(basepath)
+    dataset = get_epi_files(basepath, file_format="pt") if start_from_latents else get_epi_files(basepath, file_format="parquet")
     ds_length = len(dataset)
     epi_indices = random.sample(range(ds_length), num_episodes)
 
@@ -144,11 +138,19 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             start_idx = random.randint(0, len(data["actions"]) - episode_length - BUFFER_SIZE)
             parameters = data["parameters"][start_idx:start_idx+BUFFER_SIZE]
             initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
+            initial_frame_context = prepare_conditioning_frames(
+                vae,
+                latents=initial_frame_context,
+                device=unet.device,
+                dtype=context_latents.dtype,
+            )
             initial_action_context = data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
             actions = data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
         else:
             # Haven't tested this part yet
-            batch = collate_fn([dataset[start_idx]])
+            data = Dataset.from_parquet(episode)
+            data = collate_fn_wo_uncond([dataset[epi_idx]])
+            start_idx = random.randint(0, len(data["input_ids"]) - episode_length - BUFFER_SIZE)
             actions = [
                 dataset[i]["input_ids"][-1].item()
                 for i in range(
@@ -186,7 +188,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             os.path.join(outdir, f"rollout_{epi_idx}.gif"),
             save_all=True,
             append_images=all_images[1:],
-            duration=300,  # 100ms per frame
+            duration=100,  # 100ms per frame
             loop=1,
         )
 
