@@ -4,13 +4,14 @@ import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
+from datasets import Dataset
 from PIL import Image
 from tqdm import tqdm
 import os
 import random
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
-from dataset import EpisodeDatasetLatent, EpisodeDatasetMod
+from dataset import preprocess_train
 from run_inference import (
     decode_and_postprocess,
     encode_conditioning_frames_wo_batch_dim,
@@ -124,7 +125,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         else "cpu"
     )
 
-    dataset = get_epi_files(basepath, file_format="pt") if start_from_latents else get_epi_files(basepath, file_format="parquet")
+    dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels else get_epi_files(basepath, file_format="pt")
     ds_length = len(dataset)
     epi_indices = random.sample(range(ds_length), num_episodes)
 
@@ -138,10 +139,10 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
     for epi_idx in epi_indices:
         episode = dataset[epi_idx]
         epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
-        start_idx = random.randint(0, len(epi_data["input_ids"]) - episode_length - BUFFER_SIZE)
+        start_idx = random.randint(0, len(epi_data["actions"]) - episode_length - BUFFER_SIZE)
 
         if start_from_pixels:
-            # Haven't tested this part yet
+            epi_data = epi_data.with_transform(preprocess_train)
             collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
 
             # Encode initial context frames
@@ -155,6 +156,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             # Store all generated latents - split context frames into individual tensors
             initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
             initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
+            future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
         else:
             parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
             initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
@@ -165,8 +167,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
                 dtype=context_latents.dtype,
             )
             initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
-
-        future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
+            future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
 
         all_images = generate_rollout(
             unet=unet,
