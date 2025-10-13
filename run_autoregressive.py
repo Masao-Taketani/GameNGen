@@ -10,10 +10,10 @@ import os
 import random
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
-from dataset import EpisodeDatasetLatent, EpisodeDatasetMod, collate_fn_wo_uncond
+from dataset import EpisodeDatasetLatent, EpisodeDatasetMod
 from run_inference import (
     decode_and_postprocess,
-    encode_conditioning_frames,
+    encode_conditioning_frames_wo_batch_dim,
     next_latent,
     prepare_conditioning_frames,
 )
@@ -109,8 +109,13 @@ def load_pt(fpath):
     return torch.load(fpath)
 
 
+def collate_pixels_and_actions(epi_data):
+    return {'pixel_values': torch.stack(epi_data['pixel_values']),
+            'input_ids': epi_data['input_ids']}
+
+
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, start_from_latents: bool, num_inference_steps: int, outdir: str) -> None:
+         vae_model_folder: str, start_from_pixels: bool, num_inference_steps: int, outdir: str) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -131,12 +136,27 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
     image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
     for epi_idx in epi_indices:
-        
         episode = dataset[epi_idx]
-        if start_from_latents:
-            data = load_pt(episode)
-            start_idx = random.randint(0, len(data["actions"]) - episode_length - BUFFER_SIZE)
-            parameters = data["parameters"][start_idx:start_idx+BUFFER_SIZE]
+        epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
+        start_idx = random.randint(0, len(epi_data["input_ids"]) - episode_length - BUFFER_SIZE)
+
+        if start_from_pixels:
+            # Haven't tested this part yet
+            collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
+
+            # Encode initial context frames
+            with torch.inference_mode():
+                context_latents = encode_conditioning_frames_wo_batch_dim(
+                    vae,
+                    images=collate_epi_data["pixel_values"],
+                    dtype=torch.float32,
+                )
+
+            # Store all generated latents - split context frames into individual tensors
+            initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
+            initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
+        else:
+            parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
             initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
             initial_frame_context = prepare_conditioning_frames(
                 vae,
@@ -144,32 +164,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
                 device=unet.device,
                 dtype=context_latents.dtype,
             )
-            initial_action_context = data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
-            actions = data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
-        else:
-            # Haven't tested this part yet
-            data = Dataset.from_parquet(episode)
-            data = collate_fn_wo_uncond([dataset[epi_idx]])
-            start_idx = random.randint(0, len(data["input_ids"]) - episode_length - BUFFER_SIZE)
-            actions = [
-                dataset[i]["input_ids"][-1].item()
-                for i in range(
-                    start_idx + BUFFER_SIZE, start_idx + BUFFER_SIZE + episode_length
-                )
-            ]
+            initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
 
-            # Encode initial context frames
-            with torch.inference_mode():
-                context_latents = encode_conditioning_frames(
-                    vae,
-                    images=batch["pixel_values"],
-                    vae_scale_factor=vae_scale_factor,
-                    dtype=torch.float32,
-                )
-
-            # Store all generated latents - split context frames into individual tensors
-            initial_frame_context = context_latents.squeeze(0)  # [BUFFER_SIZE, 4, 32, 40]
-            initial_action_context = batch["input_ids"].squeeze(0)[:BUFFER_SIZE].to(device)
+        future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
 
         all_images = generate_rollout(
             unet=unet,
@@ -177,7 +174,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             action_embedding=action_embedding,
             noise_scheduler=noise_scheduler,
             image_processor=image_processor,
-            actions=actions,
+            actions=future_actions,
             initial_frame_context=initial_frame_context,
             initial_action_context=initial_action_context,
             num_inference_steps=num_inference_steps,
@@ -272,8 +269,7 @@ if __name__ == "__main__":
         help="A seed for reproducible inference."
     )
     args = parser.parse_args()
-    start_from_latents = False if args.start_from_pixels else True
     set_seed(args.seed)
     main(args.dataset_basepath, args.num_episodes, args.episode_length, 
-         args.unet_model_folder, args.vae_ft_model_folder, start_from_latents,
+         args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
          args.num_inference_steps, args.gif_outdir)

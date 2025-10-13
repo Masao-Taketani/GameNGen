@@ -27,6 +27,19 @@ np.random.seed(9052924)
 random.seed(9052924)
 
 
+def encode_conditioning_frames_wo_batch_dim(
+    vae: AutoencoderKL, images: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """
+    For this function, images has to have (time, channels, height, width) dims (without batch dim),
+    and return the same shape
+    """
+    conditioning_frame_latents = vae.encode(
+        images.to(device=vae.device, dtype=dtype)
+    ).latent_dist.sample()
+    conditioning_frame_latents = conditioning_frame_latents * vae.config.scaling_factor
+    return conditioning_frame_latents
+
+
 def encode_conditioning_frames(
     vae: AutoencoderKL, images: torch.Tensor, vae_scale_factor: int, dtype: torch.dtype
 ) -> torch.Tensor:
