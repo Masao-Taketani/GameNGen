@@ -164,7 +164,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
                 vae,
                 latents=initial_frame_context,
                 device=unet.device,
-                dtype=context_latents.dtype,
+                dtype=initial_frame_context.dtype,
             )
             initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
             future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
