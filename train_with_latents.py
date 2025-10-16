@@ -484,6 +484,14 @@ def parse_args():
             "Specify your resuming step. Only applicable if `load_pretrained` is set."
         ),
     )
+    parser.add_argument(
+        "--vae_model_folder_or_id",
+        type=str,
+        default=None,
+        help=("Path to a directory containing VAE model used just for evaluation."
+              "If None, the one from PRETRAINED_MODEL_NAME_OR_PATH is used."
+        ),
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -560,7 +568,8 @@ def main():
     # This is a bit wasteful
     action_dim = args.action_dim
     comb_train_model, vae, noise_scheduler, text_encoder = get_model(
-        action_dim, skip_image_conditioning=args.skip_image_conditioning
+        action_dim, skip_image_conditioning=args.skip_image_conditioning, 
+        vae_model_folder_or_id=args.vae_model_folder_or_id
     )
 
     if args.load_pretrained:

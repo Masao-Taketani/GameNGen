@@ -52,7 +52,7 @@ def get_vae(model_folder_or_id: str | None = None) -> AutoencoderKL:
         return AutoencoderKL.from_pretrained(model_folder_or_id, subfolder="vae")
 
 def get_model(
-    action_embedding_dim: int, skip_image_conditioning: bool = False
+    action_embedding_dim: int, skip_image_conditioning: bool = False, vae_model_folder_or_id: str | None = None
 ) -> tuple[
     CombinedTrainModel,
     AutoencoderKL,
@@ -78,7 +78,7 @@ def get_model(
     # This is what the paper uses
     noise_scheduler.register_to_config(prediction_type="v_prediction")
 
-    vae = get_vae()
+    vae = get_vae(vae_model_folder_or_id)
 
     unet = UNet2DConditionModel.from_pretrained(
         PRETRAINED_MODEL_NAME_OR_PATH, subfolder="unet"
