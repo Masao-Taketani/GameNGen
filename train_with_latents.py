@@ -51,6 +51,7 @@ from config_sd import (
     TRAINING_DATASET_DICT,
     VALIDATION_PROMPT,
     ZERO_OUT_ACTION_CONDITIONING_PROB,
+    MAX_NOISE_LEVEL,
 )
 from dataset import get_latent_dataloader
 from model import get_model, save_and_maybe_upload_to_hub
@@ -771,6 +772,7 @@ def main():
     logger.info(
         f"  Zero out action conditioning probability = {ZERO_OUT_ACTION_CONDITIONING_PROB}"
     )
+    logger.info(f"  maximal noise level = {MAX_NOISE_LEVEL}")
     logger.info(f"  Skip action conditioning = {args.skip_action_conditioning}")
     logger.info(f"  Skip image conditioning = {args.skip_image_conditioning}")
     logger.info(f"  Use CFG = {args.use_cfg}")
