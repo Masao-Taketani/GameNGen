@@ -900,14 +900,17 @@ def main():
                         latents[:, -1:, :, :, :], noise, timesteps
                     )
 
-                    # Generate noise for the conditioning frames with a corresponding discrete noise level
-                    noise_level, discretized_noise_level = get_conditioning_noise(
-                        latents[:, :-1, :, :, :]
-                    )
-                    # Add noise to the conditioning frames only
-                    noisy_latents[:, :-1, :, :, :] = add_conditioning_noise(
-                        latents[:, :-1, :, :, :], noise_level
-                    )
+                    if MAX_NOISE_LEVEL > 0:
+                        # Generate noise for the conditioning frames with a corresponding discrete noise level
+                        noise_level, discretized_noise_level = get_conditioning_noise(
+                            latents[:, :-1, :, :, :]
+                        )
+                        # Add noise to the conditioning frames only
+                        noisy_latents[:, :-1, :, :, :] = add_conditioning_noise(
+                            latents[:, :-1, :, :, :], noise_level
+                        )
+                    else:
+                        discretized_noise_level = torch.zeros(latents.shape[0], device=latents.device).to(torch.int32)
 
                     # We collapse the frame conditioning into the channel dimension
                     concatenated_latents = noisy_latents.view(
