@@ -53,7 +53,7 @@ Vizdoom Agent:
 
 ## Scripts
 
-### Generate the training data
+### Generate training data for diffusion models while training an RL agent 
 
 First, follow the commands below in order to create an environment to train Vizdoom agent.
 ```
@@ -80,6 +80,16 @@ Note: you can also generate a gif file to QA the behavior of the agent by runnin
 python load_model_generate_dataset.py --episodes 1 --output gif
 ```
 
+### Train the diffusion model
+
+Second step is that follow the commands below in order to create an environment to train diffusion model.
+```
+conda deactivate
+conda create -n diffusion python=3.11 -y
+conda activate diffusion
+pip install -r diffusion_requirements.txt
+```
+
 ### Convert image dataset to latent embedding dataset
 You are going to convert the collected image dataset (`.parquet` files) into latent embedding dataset (`.pt` files), so that you can save lots of memory during diffusion training. For that, you are recommended to use at least one GPU. Use the following command to execute with single GPU.
 ```
@@ -91,45 +101,26 @@ You can also use multiple GPUs to process the conversion in parallel (each GPU p
 python encode_images.py --dataset_basepath [directory path under which parquet files are placed] --save_dir_path [pt file save directory path] --dataloader_num_workers [number of workers for dataloader] --batch_size [batch size to process for one step] --dtype [data type used for inference] --num_chunks [number of chunks to split your dataset] --chunk_id [chunk ID] --gpu_id [GPU ID]
 ```
 
-
-### Train the diffusion model
-
-Second step is that follow the commands below in order to create an environment to train diffusion model.
-```
-conda deactivate
-conda create -n diffusion python=3.11 -y
-conda activate diffusion
-pip install -r diffusion_requirements.txt
-```
-
 #### Single GPU
-If you only have single gpu, follow the instruction below to train the diffusion model.
-Debug training with single GPU.
+If you only have single gpu, after modifying some arguments(such as dataset path) of `train_diffusion_scripts/single_gpu_latents.sh`, follow the instruction below to train the diffusion model.
 ```
-sh train_diffusion_scripts/debug_single_gpu.sh
-```
-
-Start full training with single GPU.
-```
-sh train_diffusion_scripts/single_gpu.sh
+sh train_diffusion_scripts/single_gpu_latents.sh
 ```
 
 #### Multiple GPUs
-If you have more than single GPU, follow the instruction below to train the diffusion model.
-Debug training with multiple GPUs.
+If you have more than single GPU, after modifying some arguments(such as dataset path) of `train_diffusion_scripts/multi_gpus_latents.sh`, follow the instruction below to train the diffusion model.
 ```
-sh train_diffusion_scripts/debug_multi_gpus.sh
-```
-
-Start full training with multiple GPUs.
-```
-sh train_diffusion_scripts/multi_gpus.sh
+sh train_diffusion_scripts/multi_gpus_latents.sh
 ```
 
 ### Train the auto-encoder
 
+#### Single GPU
+
+#### Multiple GPUs
+If you have more than single GPU, after modifying some arguments(such as dataset path) of `finetune_vae_scripts/multi_gpus.sh`, follow the instruction below to finetune the decoder of VAE
 ```
-python finetune_autoencoder.py --hf_model_folder {path to the model folder}
+sh finetune_vae_scripts/multi_gpus.sh
 ```
 
 ### Run inference (generating a single image)
