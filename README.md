@@ -9,7 +9,7 @@ Here are the list of modifications from [arnaudstiegler/gameNgen-repro](https://
 cd GameNGen
 docker run --log-opt max-size=10m --log-opt max-file=2 -it --rm --gpus '"device={input your GPU device ID(s) here}"' -v .:/work continuumio/anaconda3:latest
 ```
-I strongly recommend using `--log-opt max-size` option since the RL training script for ViZDoom outputs lots of logs to stdout, which conssumes excessive disk space.
+Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt max-size` option since the RL training script for ViZDoom outputs lots of logs to stdout, which conssumes excessive disk space.
 - Use the original paper's training setup as much as I can
 - Incorporate much more efficient diffusion training method and data files
 
