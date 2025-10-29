@@ -34,7 +34,7 @@ def has_excluded_pair(actions: np.ndarray, buttons: np.array) -> np.array:
         axis=-1) > 1, axis=-1)
 
 
-def get_available_actions(buttons: np.array) -> t.List[t.List[float]]:
+def get_available_actions(buttons: np.array, include_no_op: bool = True) -> t.List[t.List[float]]:
     # Create list of all possible actions of size (2^n_available_buttons x n_available_buttons)
     action_combinations = np.array([list(seq) for seq in itertools.product([0., 1.], repeat=len(buttons))])
 
@@ -43,8 +43,8 @@ def get_available_actions(buttons: np.array) -> t.List[t.List[float]]:
                     | has_exclusive_button(action_combinations, buttons))
 
     possible_actions = action_combinations[~illegal_mask]
-    possible_actions = possible_actions[np.sum(possible_actions, axis=1) > 0]  # Remove no-op
+    if not include_no_op:
+        possible_actions = possible_actions[np.sum(possible_actions, axis=1) > 0]  # Remove no-op
 
     print('Built action space of size {} from buttons {}'.format(len(possible_actions), buttons))
     return possible_actions.tolist()
-
