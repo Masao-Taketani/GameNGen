@@ -15,6 +15,7 @@ Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt
 
 ## To Do
 - [x] Set `MOVE_LEFT` and `MOVE_RIGHT` as independent actions
+- [x] Add no-op action to the action space
 - [x] Enable distributed training
 - [ ] Implement playable generative environments
 - [x] Try using the original settings
