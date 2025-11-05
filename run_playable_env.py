@@ -9,6 +9,9 @@ from PIL import Image
 from tqdm import tqdm
 import os
 import random
+import cv2
+import keyboard
+import time
 
 from config_sd import BUFFER_SIZE, CFG_GUIDANCE_SCALE, DEFAULT_NUM_INFERENCE_STEPS
 from dataset import preprocess_train
@@ -233,6 +236,189 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             duration=100,  # 100ms per frame
             loop=1,
         )
+
+
+def select_action_for_pong(fire, right, left, device):
+    if keyboard.is_pressed(fire):
+        # Fire
+        action = torch.tensor([1], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(right):
+        # Move right
+        action = torch.tensor([2], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(left):
+        # Move left
+        action = torch.tensor([3], dtype=torch.int64).to(device)
+    else:
+        # No operation
+        action = torch.tensor([0], dtype=torch.int64).to(device)
+    
+    return action
+
+def select_action_for_boxing(fire, up, right, left, down, device):
+    if keyboard.is_pressed(fire):
+        # Fire
+        action = torch.tensor([1], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(up):
+        # Move up
+        action = torch.tensor([2], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(right):
+        # Move right
+        action = torch.tensor([3], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(left):
+        # Fire left
+        action = torch.tensor([4], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(down):
+        # Fire down
+        action = torch.tensor([5], dtype=torch.int64).to(device)
+    else:
+        # No operation
+        action = torch.tensor([0], dtype=torch.int64).to(device)
+    
+    return action
+
+def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
+                  move_right, move_left, move_forward, turn_left_move_for, turn_right_move_for,
+                  attack, turn_left_attack, turn_right_attack, move_back_attack, turn_left_move_back_attack,
+                  turn_right_move_back_attack, move_for_attack, turn_left_move_for_attack, turn_right_move_for_attack,
+                  device):
+    if keyboard.is_pressed(turn_left):
+        action = torch.tensor([1], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([2], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([3], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([4], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([5], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([6], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([7], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([8], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([9], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([10], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([11], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([12], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([13], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([14], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([15], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([16], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([17], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([18], dtype=torch.int64).to(device)
+    elif keyboard.is_pressed(turn_right):
+        action = torch.tensor([19], dtype=torch.int64).to(device)
+    else:
+        # No operation
+        action = torch.tensor([0], dtype=torch.int64).to(device)
+    return action
+
+def main(unet_model_folder, vae_model_folder, device, num_steps=None):
+    # Specify actions
+    turn_left = ""
+    turn_right = ""
+    move_back = ""
+    turn_left_move_back = ""
+    turn_right_move_back = ""
+    move_right = ""
+    move_left = ""
+    move_forward = "" 
+    turn_left_move_for = "" 
+    turn_right_move_for = ""
+    attack = ""
+    turn_left_attack = "" 
+    turn_right_attack = "" 
+    move_back_attack = "" 
+    turn_left_move_back_attack = ""
+    turn_right_move_back_attack = "" 
+    move_for_attack = "" 
+    turn_left_move_for_attack = "" 
+    turn_right_move_for_attack = "" 
+    unet, vae, action_embedding, noise_scheduler = load_model(
+        unet_model_folder, vae_model_folder, device=device
+    )
+
+    cur_img = show_and_return_init_img(args.init_img_path).to(device)
+    i = 0
+
+    if args.rec:
+        if args.cv2_rec:
+            fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+            rec_path = args.rec_path_wo_ext + '.mp4'
+            video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (args.img_size[1], args.img_size[0]))
+            np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
+            video_writer.write(np_img)
+        elif args.gif_rec:
+            np_imgs = []
+            np_imgs.append(convert_from_torch_to_numpy(cur_img))
+
+    if args.make_action_log:
+        if not args.action_log_dir:
+            assert 0, 'When make_action_log flag is used, you need to specify \
+                       a directory path to save the action log.'
+        action_log = []
+
+    while True:
+        frame_start_time = time.time()
+
+        if keyboard.is_pressed('q'):
+            break
+
+        if args.random_action:
+            actions = []
+            for _ in range(args.num_agents):
+                actions.append(torch.tensor([random.randint(0, args.action_space-1)], dtype=torch.int64).to(device))
+        else:
+            action = select_action()
+        
+        if args.make_action_log:
+            action_log.append(list(actions))
+
+        cur_img_emb = vae.enc(cur_img)
+        if args.old:
+            fut_img_emb = translearner.test_step(cur_img_emb, *actions)
+        else:
+            fut_img_emb = translearner.test_step(cur_img_emb, actions)
+        cur_img = vae.dec(fut_img_emb)
+        render(cur_img)
+
+        if args.rec:
+            if args.cv2_rec:
+                np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
+                video_writer.write(np_img)
+            elif args.gif_rec:
+                np_imgs.append(convert_from_torch_to_numpy(cur_img))
+        cv2.waitKey(1)
+
+        wait = 1/args.fps - (time.time() - frame_start_time)
+        if num_steps is not None and i == num_steps:
+            break
+        i += 1
+        if wait > 0:
+            time.sleep(wait)
+
+    if args.make_action_log:
+        create_action_log(args, action_log)
+    
+    if args.rec and args.gif_rec:
+        pil_imgs = []
+        for img in np_imgs:
+            pil_imgs.append(Image.fromarray(img))
+        rec_path = args.rec_path_wo_ext + '.gif'
+        pil_imgs[0].save(rec_path, save_all=True, append_images=pil_imgs[1:], 
+                optimize=False, duration=20, loop=0)
+
 
 
 if __name__ == "__main__":
