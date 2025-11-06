@@ -461,8 +461,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_train_envs",
         type=int,
-        default=16,
+        default=8,
         help="Specify the number of parallel environments to train the agent.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=64,
+        help="Minibatch size for agent policy training.",
+    )
+    parser.add_argument(
+        "--n_steps",
+        type=int,
+        default=2048,
+        help="Minibatch size for agent policy training.",
     )
     parser.add_argument(
         "--n_eval_envs",
@@ -475,9 +487,9 @@ if __name__ == "__main__":
 
     # Agent parameters.
     agent_args = {
-        "n_steps": 4096,
+        "n_steps": args.n_steps,
         "learning_rate": 1e-4,
-        "batch_size": 64,
+        "batch_size": args.batch_size,
         "policy_kwargs": {"features_extractor_class": CustomCNN},
         "device": device,
     }
