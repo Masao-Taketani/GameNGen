@@ -4,7 +4,7 @@ import os
 from tqdm import tqdm
 import torch
 
-from model import get_ft_vae_decoder
+from model import get_vae
 from dataset import get_dataloader_prep
 from config_sd import HEIGHT, WIDTH, H_PAD, W_PAD
 
@@ -66,6 +66,15 @@ def parse_args():
             "use this argumment. If None and GPU(s) is/are avaiable, The first index is used."
         ),
     )
+    
+    parser.add_argument(
+        "--model_folder_or_id",
+        type=str,
+        default=None,
+        help=(
+            "Specify VAE model folder or HF id. If None, 'PRETRAINED_MODEL_NAME_OR_PATH' is used."
+        ),
+    )
 
     args = parser.parse_args()
     return args
@@ -113,7 +122,7 @@ def main():
         num_workers=args.dataloader_num_workers,
     )
     start_epi_id = dataloader.dataset.epi_id
-    vae = get_ft_vae_decoder()
+    vae = get_vae(args.model_folder_or_id)
     vae.to(device, dtype=weight_dtype)
 
     for epi_id, (imgs, acts) in tqdm(enumerate(dataloader), total=len(dataloader)):
