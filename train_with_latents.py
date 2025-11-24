@@ -407,6 +407,13 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--track_params_grads",
+        action="store_true",
+        help=(
+            "Whether or not to log both parameters and their gradients with wandb."
+        ),
+    )
+    parser.add_argument(
         "--local_rank",
         type=int,
         default=-1,
@@ -826,6 +833,8 @@ def main():
         # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
     )
+
+    if args.track_params_grads: wandb.watch(comb_train_model, log='all', log_freq=100)
 
     break_while = False
     while True:
