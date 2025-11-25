@@ -414,6 +414,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--wandb_watch_freq",
+        type=int,
+        default=1000,
+        help=(
+            "Log frequency used for wandb.watch. Only available if 'track_params_grads' is true."
+        ),
+    )
+    parser.add_argument(
         "--local_rank",
         type=int,
         default=-1,
@@ -834,7 +842,7 @@ def main():
         disable=not accelerator.is_local_main_process,
     )
 
-    if args.track_params_grads: wandb.watch(comb_train_model, log='all', log_freq=100)
+    if args.track_params_grads: wandb.watch(comb_train_model, log='all', log_freq=args.wandb_watch_freq)
 
     break_while = False
     while True:
