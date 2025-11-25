@@ -143,7 +143,7 @@ def parse_args():
     parser.add_argument(
         "--action_dim",
         type=int,
-        default=18,
+        default=12,
         help=(
             "The number of action dim the RL agent has trained with."
         ),

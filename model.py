@@ -65,9 +65,13 @@ def get_model(
         skip_image_conditioning: whether to skip image conditioning
     """
 
-    # This will be used to encode the actions
+    # This will be used to encode the actions (+1 for no-op)
+    #action_embedding = nn.Embedding(
+    #    num_embeddings=action_embedding_dim + 1, embedding_dim=768
+    #)
+    # The following action_embedding_dim already includes no-op action
     action_embedding = nn.Embedding(
-        num_embeddings=action_embedding_dim + 1, embedding_dim=768
+        num_embeddings=action_embedding_dim, embedding_dim=768
     )
     nn.init.normal_(action_embedding.weight, mean=0.0, std=0.02)
 
