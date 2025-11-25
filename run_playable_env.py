@@ -35,26 +35,18 @@ Built action space of size 20 from buttons
  <Button.TURN_LEFT: 15>
 ]
 
-0:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-1:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-2:  [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-3:  [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-4:  [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0],
-5:  [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0],
-6:  [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-7:  [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-8:  [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-9:  [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-10: [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-11: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-12: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-13: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-14: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-15: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0],
-16: [1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0],
-17: [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-18: [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-19: [1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]]
+0:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+1:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+2:  [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+3:  [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+4:  [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0]
+5:  [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+6:  [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+7:  [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+8:  [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+9:  [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+10: [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+11: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 0:  no-op
 1:  turn left
@@ -68,14 +60,6 @@ Built action space of size 20 from buttons
 9:  turn left + move forward
 10: turn right + move forward
 11: attack
-12: turn left + attack
-13: turn right + attack
-14: move backward + attack
-15: turn left + move backward + attack
-16: turn right + move backward + attack
-17: move forward + attack
-18: turn left + move forward + attack
-19: turn right + move forward + attack
 """
 
 
@@ -238,113 +222,50 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
         )
 
 
-def select_action_for_pong(fire, right, left, device):
-    if keyboard.is_pressed(fire):
-        # Fire
-        action = torch.tensor([1], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(right):
-        # Move right
-        action = torch.tensor([2], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(left):
-        # Move left
-        action = torch.tensor([3], dtype=torch.int64).to(device)
-    else:
-        # No operation
-        action = torch.tensor([0], dtype=torch.int64).to(device)
-    
-    return action
-
-def select_action_for_boxing(fire, up, right, left, down, device):
-    if keyboard.is_pressed(fire):
-        # Fire
-        action = torch.tensor([1], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(up):
-        # Move up
-        action = torch.tensor([2], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(right):
-        # Move right
-        action = torch.tensor([3], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(left):
-        # Fire left
-        action = torch.tensor([4], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(down):
-        # Fire down
-        action = torch.tensor([5], dtype=torch.int64).to(device)
-    else:
-        # No operation
-        action = torch.tensor([0], dtype=torch.int64).to(device)
-    
-    return action
-
 def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
                   move_right, move_left, move_forward, turn_left_move_for, turn_right_move_for,
-                  attack, turn_left_attack, turn_right_attack, move_back_attack, turn_left_move_back_attack,
-                  turn_right_move_back_attack, move_for_attack, turn_left_move_for_attack, turn_right_move_for_attack,
-                  device):
+                  attack, device):
     if keyboard.is_pressed(turn_left):
         action = torch.tensor([1], dtype=torch.int64).to(device)
     elif keyboard.is_pressed(turn_right):
         action = torch.tensor([2], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(move_back):
         action = torch.tensor([3], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(turn_left_move_back):
         action = torch.tensor([4], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(turn_right_move_back):
         action = torch.tensor([5], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(move_right):
         action = torch.tensor([6], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(move_left):
         action = torch.tensor([7], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(move_forward):
         action = torch.tensor([8], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(turn_left_move_for):
         action = torch.tensor([9], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(turn_right_move_for):
         action = torch.tensor([10], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
+    elif keyboard.is_pressed(attack):
         action = torch.tensor([11], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([12], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([13], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([14], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([15], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([16], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([17], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([18], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right):
-        action = torch.tensor([19], dtype=torch.int64).to(device)
     else:
         # No operation
         action = torch.tensor([0], dtype=torch.int64).to(device)
     return action
 
+
 def main(unet_model_folder, vae_model_folder, device, num_steps=None):
     # Specify actions
-    turn_left = ""
-    turn_right = ""
-    move_back = ""
-    turn_left_move_back = ""
-    turn_right_move_back = ""
-    move_right = ""
-    move_left = ""
-    move_forward = "" 
-    turn_left_move_for = "" 
-    turn_right_move_for = ""
-    attack = ""
-    turn_left_attack = "" 
-    turn_right_attack = "" 
-    move_back_attack = "" 
-    turn_left_move_back_attack = ""
-    turn_right_move_back_attack = "" 
-    move_for_attack = "" 
-    turn_left_move_for_attack = "" 
-    turn_right_move_for_attack = "" 
+    turn_left = "a"
+    turn_right = "g"
+    move_back = "x"
+    turn_left_move_back = "z"
+    turn_right_move_back = "c"
+    move_right = "f"
+    move_left = "s"
+    move_forward = "r" 
+    turn_left_move_for = "e" 
+    turn_right_move_for = "t"
+    attack = "d"
     unet, vae, action_embedding, noise_scheduler = load_model(
         unet_model_folder, vae_model_folder, device=device
     )
@@ -380,7 +301,9 @@ def main(unet_model_folder, vae_model_folder, device, num_steps=None):
             for _ in range(args.num_agents):
                 actions.append(torch.tensor([random.randint(0, args.action_space-1)], dtype=torch.int64).to(device))
         else:
-            action = select_action()
+            action = select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
+                                   move_right, move_left, move_forward, turn_left_move_for, turn_right_move_for,
+                                   attack, device)
         
         if args.make_action_log:
             action_log.append(list(actions))
@@ -488,11 +411,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--action_dim",
         type=int,
-        default=18,
+        default=12,
         help=(
             "The number of action dim the RL agent has trained with."
         ),
     )
+    parser.add_argument('--make_action_log', action='store_true')
     parser.add_argument(
         "--seed", 
         type=int, 
