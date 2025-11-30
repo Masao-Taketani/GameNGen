@@ -68,7 +68,6 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
 
-
 def generate_rollout(
     unet,
     vae,
@@ -124,7 +123,6 @@ def generate_rollout(
             )
     return all_images
 
-
 def get_epi_files(basepath, file_format="pt"):
     samples = []
     for dirpath, dirnames, filenames in os.walk(basepath):
@@ -136,94 +134,15 @@ def get_epi_files(basepath, file_format="pt"):
                     samples.append(os.path.join(dirpath, filename))
     return samples
 
-
 def load_pt(fpath):
     return torch.load(fpath)
-
 
 def collate_pixels_and_actions(epi_data):
     return {'pixel_values': torch.stack(epi_data['pixel_values']),
             'input_ids': epi_data['input_ids']}
 
-
-def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, start_from_pixels: bool, num_inference_steps: int, outdir: str) -> None:
-    device = torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
-
-    dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels else get_epi_files(basepath, file_format="pt")
-    ds_length = len(dataset)
-    epi_indices = random.sample(range(ds_length), num_episodes)
-
-    unet, vae, action_embedding, noise_scheduler = load_model(
-        unet_model_folder, vae_model_folder, device=device
-    )
-
-    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
-    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
-
-    for epi_idx in epi_indices:
-        episode = dataset[epi_idx]
-        epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
-        start_idx = random.randint(0, len(epi_data["actions"]) - episode_length - BUFFER_SIZE)
-
-        if start_from_pixels:
-            epi_data = epi_data.with_transform(preprocess_train)
-            collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
-
-            # Encode initial context frames
-            with torch.inference_mode():
-                context_latents = encode_conditioning_frames_wo_batch_dim(
-                    vae,
-                    images=collate_epi_data["pixel_values"],
-                    dtype=torch.float32,
-                )
-
-            # Store all generated latents - split context frames into individual tensors
-            initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
-            initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
-            future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
-        else:
-            parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
-            initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
-            initial_frame_context = prepare_conditioning_frames(
-                vae,
-                latents=initial_frame_context,
-                device=unet.device,
-                dtype=initial_frame_context.dtype,
-            )
-            initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
-            future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
-
-        all_images = generate_rollout(
-            unet=unet,
-            vae=vae,
-            action_embedding=action_embedding,
-            noise_scheduler=noise_scheduler,
-            image_processor=image_processor,
-            actions=future_actions,
-            initial_frame_context=initial_frame_context,
-            initial_action_context=initial_action_context,
-            num_inference_steps=num_inference_steps,
-        )
-
-        os.makedirs(outdir, exist_ok=True)
-        all_images[0].save(
-            os.path.join(outdir, f"rollout_{epi_idx}.gif"),
-            save_all=True,
-            append_images=all_images[1:],
-            duration=100,  # 100ms per frame
-            loop=1,
-        )
-
-
 def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
-                  move_right, move_left, move_forward, turn_left_move_for, turn_right_move_for,
+                  move_right, move_left, move_forward, turn_left_move_forward, turn_right_move_forward,
                   attack, device):
     if keyboard.is_pressed(turn_left):
         action = torch.tensor([1], dtype=torch.int64).to(device)
@@ -241,9 +160,9 @@ def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_ri
         action = torch.tensor([7], dtype=torch.int64).to(device)
     elif keyboard.is_pressed(move_forward):
         action = torch.tensor([8], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_left_move_for):
+    elif keyboard.is_pressed(turn_left_move_forward):
         action = torch.tensor([9], dtype=torch.int64).to(device)
-    elif keyboard.is_pressed(turn_right_move_for):
+    elif keyboard.is_pressed(turn_right_move_forward):
         action = torch.tensor([10], dtype=torch.int64).to(device)
     elif keyboard.is_pressed(attack):
         action = torch.tensor([11], dtype=torch.int64).to(device)
@@ -252,8 +171,16 @@ def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_ri
         action = torch.tensor([0], dtype=torch.int64).to(device)
     return action
 
+def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
+         num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str) -> None:
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
 
-def main(unet_model_folder, vae_model_folder, device, num_steps=None):
     # Specify actions
     turn_left = "a"
     turn_right = "g"
@@ -262,86 +189,120 @@ def main(unet_model_folder, vae_model_folder, device, num_steps=None):
     turn_right_move_back = "c"
     move_right = "f"
     move_left = "s"
-    move_forward = "r" 
-    turn_left_move_for = "e" 
-    turn_right_move_for = "t"
+    move_forward = "e" 
+    turn_left_move_forward = "w" 
+    turn_right_move_forward = "r"
     attack = "d"
     unet, vae, action_embedding, noise_scheduler = load_model(
         unet_model_folder, vae_model_folder, device=device
     )
 
-    cur_img = show_and_return_init_img(args.init_img_path).to(device)
-    i = 0
+    dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels \
+                                                             else get_epi_files(basepath, file_format="pt")
+    ds_length = len(dataset)
+    epi_idx = random.sample(range(ds_length), num_episodes)
 
-    if args.rec:
-        if args.cv2_rec:
-            fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-            rec_path = args.rec_path_wo_ext + '.mp4'
-            video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (args.img_size[1], args.img_size[0]))
-            np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
-            video_writer.write(np_img)
-        elif args.gif_rec:
-            np_imgs = []
-            np_imgs.append(convert_from_torch_to_numpy(cur_img))
+    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+
+    episode = dataset[epi_idx]
+    epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
+    start_idx = random.randint(0, len(epi_data["actions"]) - episode_length - BUFFER_SIZE)
+
+    if start_from_pixels:
+        epi_data = epi_data.with_transform(preprocess_train)
+        collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
+
+        cur_img = show_and_return_init_img(args.init_img_path).to(device)
+
+        # Encode initial context frames
+        with torch.inference_mode():
+            context_latents = encode_conditioning_frames_wo_batch_dim(
+                vae,
+                images=collate_epi_data["pixel_values"],
+                dtype=torch.float32,
+            )
+
+        # Store all generated latents - split context frames into individual tensors
+        initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
+        initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
+        future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
+    else:
+        parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
+        initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
+        initial_frame_context = prepare_conditioning_frames(
+            vae,
+            latents=initial_frame_context,
+            device=unet.device,
+            dtype=initial_frame_context.dtype,
+        )
+
+        cur_img = show_and_return_init_img(args.init_img_path).to(device)
+
+        initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
+        future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
+    
+    if args.cv2_rec:
+        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+        rec_path = rec_path_wo_ext + '.mp4'
+        video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (args.img_size[1], args.img_size[0]))
+        np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
+        video_writer.write(np_img)
+    elif args.gif_rec:
+        np_imgs = []
+        np_imgs.append(convert_from_torch_to_numpy(cur_img))
 
     if args.make_action_log:
-        if not args.action_log_dir:
-            assert 0, 'When make_action_log flag is used, you need to specify \
-                       a directory path to save the action log.'
+        os.makedirs(args.action_log_dir, exist_ok=True)
         action_log = []
 
+    i = 0
     while True:
         frame_start_time = time.time()
 
-        if keyboard.is_pressed('q'):
-            break
+        if keyboard.is_pressed('q'): break
 
-        if args.random_action:
-            actions = []
-            for _ in range(args.num_agents):
-                actions.append(torch.tensor([random.randint(0, args.action_space-1)], dtype=torch.int64).to(device))
-        else:
-            action = select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
-                                   move_right, move_left, move_forward, turn_left_move_for, turn_right_move_for,
-                                   attack, device)
-        
-        if args.make_action_log:
-            action_log.append(list(actions))
+        action = select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
+                                move_right, move_left, move_forward, turn_left_move_forward, 
+                                turn_right_move_forward, attack, device)
 
-        cur_img_emb = vae.enc(cur_img)
-        if args.old:
-            fut_img_emb = translearner.test_step(cur_img_emb, *actions)
-        else:
-            fut_img_emb = translearner.test_step(cur_img_emb, actions)
+        if args.make_action_log: action_log.append(list(actions))
+
+        all_images = generate_rollout(
+            unet=unet,
+            vae=vae,
+            action_embedding=action_embedding,
+            noise_scheduler=noise_scheduler,
+            image_processor=image_processor,
+            actions=future_actions,
+            initial_frame_context=initial_frame_context,
+            initial_action_context=initial_action_context,
+            num_inference_steps=num_inference_steps,
+        )
+
         cur_img = vae.dec(fut_img_emb)
         render(cur_img)
 
-        if args.rec:
-            if args.cv2_rec:
-                np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
-                video_writer.write(np_img)
-            elif args.gif_rec:
-                np_imgs.append(convert_from_torch_to_numpy(cur_img))
-        cv2.waitKey(1)
+        if args.cv2_rec:
+            np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
+            video_writer.write(np_img)
+        elif args.gif_rec:
+            np_imgs.append(convert_from_torch_to_numpy(cur_img))
 
-        wait = 1/args.fps - (time.time() - frame_start_time)
-        if num_steps is not None and i == num_steps:
-            break
+        wait = 1/args.max_fps - (time.time() - frame_start_time)
+        if num_episode_steps is not None and i == num_episode_steps: break
         i += 1
-        if wait > 0:
-            time.sleep(wait)
+        if wait > 0: time.sleep(wait)
 
-    if args.make_action_log:
-        create_action_log(args, action_log)
-    
-    if args.rec and args.gif_rec:
+    if args.gif_rec:
         pil_imgs = []
         for img in np_imgs:
             pil_imgs.append(Image.fromarray(img))
-        rec_path = args.rec_path_wo_ext + '.gif'
+        rec_path = rec_path_wo_ext + '.gif'
         pil_imgs[0].save(rec_path, save_all=True, append_images=pil_imgs[1:], 
                 optimize=False, duration=20, loop=0)
 
+    if args.make_action_log: create_action_log(args, action_log)
 
 
 if __name__ == "__main__":
@@ -371,7 +332,6 @@ if __name__ == "__main__":
             "The GIF output dir."
         ),
     )
-    
     parser.add_argument(
         "--num_inference_steps",
         type=int,
@@ -381,19 +341,11 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
-        "--num_episodes",
+        "--num_episode_steps",
         type=int,
-        default=20,
+        default=None,
         help=(
-            "The number of episodes to generate."
-        ),
-    )
-    parser.add_argument(
-        "--episode_length",
-        type=int,
-        default=300,
-        help=(
-            "The number of frames to generate per episode."
+            "The number of episode steps to generate."
         ),
     )
     parser.add_argument(
@@ -417,14 +369,20 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument('--make_action_log', action='store_true')
+    parser.add_argument('--action_log_dir', type=str, default='action_log_dir', 
+                        help='When make_action_log flag is used, you need to specify \
+                              a directory path to save the action log.')
     parser.add_argument(
         "--seed", 
         type=int, 
         default=9052924, 
         help="A seed for reproducible inference."
     )
+    parser.add_argument('--cv2_rec', action='store_true')
+    parser.add_argument('--gif_rec', action='store_true')
+    parser.add_argument('--rec_path_wo_ext', type=str, default='recorded_play')
+
     args = parser.parse_args()
     set_seed(args.seed)
-    main(args.dataset_basepath, args.num_episodes, args.episode_length, 
-         args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
-         args.num_inference_steps, args.gif_outdir)
+    main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
+         args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext)
