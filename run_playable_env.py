@@ -68,60 +68,53 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
 
-def generate_rollout(
+def generate_single_future_frame(
     unet,
     vae,
     action_embedding,
     noise_scheduler,
     image_processor,
-    actions: list[int],
-    initial_frame_context: torch.Tensor,
-    initial_action_context: torch.Tensor,
+    action: int,
+    context_latents: torch.Tensor,
+    current_actions: torch.Tensor,
     num_inference_steps: int
 ) -> list[Image]:
     device = unet.device
-    all_latents = []
-    current_actions = initial_action_context
-    context_latents = initial_frame_context
 
-    for i in tqdm(range(len(actions))):
-        # Generate next frame latents
-        target_latents = next_latent(
-            unet=unet,
-            noise_scheduler=noise_scheduler,
-            action_embedding=action_embedding,
-            context_latents=context_latents.unsqueeze(0),
-            device=device,
-            actions=current_actions.unsqueeze(0),
-            skip_action_conditioning=False,
-            num_inference_steps=num_inference_steps,
-            do_classifier_free_guidance=True,
-            guidance_scale=CFG_GUIDANCE_SCALE,
-        )
-        all_latents.append(target_latents)
-        current_actions = torch.cat(
-            [
-                current_actions[(-BUFFER_SIZE + 1) :],
-                torch.tensor([actions[i]]).to(device),
-            ]
-        )
+    # Generate next frame latents
+    target_latents = next_latent(
+                        unet=unet,
+                        noise_scheduler=noise_scheduler,
+                        action_embedding=action_embedding,
+                        context_latents=context_latents.unsqueeze(0),
+                        device=device,
+                        actions=current_actions.unsqueeze(0),
+                        skip_action_conditioning=False,
+                        num_inference_steps=num_inference_steps,
+                        do_classifier_free_guidance=True,
+                        guidance_scale=CFG_GUIDANCE_SCALE,
+    )
+    # The following [(-BUFFER_SIZE + 1) :] index takes the latest BUFFER_SIZE - 1 frames,
+    # so that the number of context actions will become BUFFER_SIZE by adding the newest action
+    # command. 
+    current_actions = torch.cat(
+        [
+            current_actions[(-BUFFER_SIZE + 1) :],
+            torch.tensor([action]).to(device),
+        ]
+    )
 
-        # Update context latents using sliding window
-        # Always take exactly BUFFER_SIZE most recent frames
-        context_latents = torch.cat(
-            [context_latents[(-BUFFER_SIZE + 1) :], target_latents], dim=0
-        )
+    # Update context latents using sliding window
+    # Always take exactly BUFFER_SIZE most recent frames
+    context_latents = torch.cat(
+        [context_latents[(-BUFFER_SIZE + 1) :], target_latents], dim=0
+    )
 
-    # Decode all latents to images
-    all_images = []
-    for latent in all_latents:  # Skip the initial context frames
-        with torch.inference_mode():
-            all_images.append(
-                decode_and_postprocess(
-                    vae=vae, image_processor=image_processor, latents=latent
-                )
-            )
-    return all_images
+    with torch.inference_mode():
+        future_image = decode_and_postprocess(
+                            vae=vae, image_processor=image_processor, latents=target_latents
+                       )
+    return future_image, context_latents, current_actions
 
 def get_epi_files(basepath, file_format="pt"):
     samples = []
@@ -224,22 +217,22 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             )
 
         # Store all generated latents - split context frames into individual tensors
-        initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
-        initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
+        context_latents = context_latents  # [BUFFER_SIZE, 4, 32, 40]
+        current_actions = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
         future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
     else:
         parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
-        initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
-        initial_frame_context = prepare_conditioning_frames(
+        context_latents = DiagonalGaussianDistribution(parameters).sample().to(device)
+        context_latents = prepare_conditioning_frames(
             vae,
-            latents=initial_frame_context,
+            latents=context_latents,
             device=unet.device,
-            dtype=initial_frame_context.dtype,
+            dtype=context_latents.dtype,
         )
 
         cur_img = show_and_return_init_img(args.init_img_path).to(device)
 
-        initial_action_context = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
+        current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
         future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
     
     if args.cv2_rec:
@@ -268,17 +261,17 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
 
         if args.make_action_log: action_log.append(list(actions))
 
-        all_images = generate_rollout(
-            unet=unet,
-            vae=vae,
-            action_embedding=action_embedding,
-            noise_scheduler=noise_scheduler,
-            image_processor=image_processor,
-            actions=future_actions,
-            initial_frame_context=initial_frame_context,
-            initial_action_context=initial_action_context,
-            num_inference_steps=num_inference_steps,
-        )
+        future_image, context_latents, current_actions = generate_single_future_frame(
+                                                             unet=unet,
+                                                             vae=vae,
+                                                             action_embedding=action_embedding,
+                                                             noise_scheduler=noise_scheduler,
+                                                             image_processor=image_processor,
+                                                             actions=future_actions,
+                                                             context_latents=context_latents,
+                                                             current_actions=current_actions,
+                                                             num_inference_steps=num_inference_steps,
+                                                         )
 
         cur_img = vae.dec(fut_img_emb)
         render(cur_img)
