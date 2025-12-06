@@ -101,6 +101,7 @@ def next_latent(
     do_classifier_free_guidance: bool = True,
     guidance_scale: float = CFG_GUIDANCE_SCALE,
     skip_action_conditioning: bool = False,
+    discretized_noise_level: int = 9,
 ):
     batch_size = context_latents.shape[0]
     latent_height = context_latents.shape[-2]
@@ -160,7 +161,7 @@ def next_latent(
                 t,
                 encoder_hidden_states=encoder_hidden_states,
                 timestep_cond=None,
-                class_labels=torch.zeros(batch_size, dtype=torch.long).to(device),
+                class_labels=torch.ones(batch_size, dtype=torch.long).to(device) * discretized_noise_level,
                 return_dict=False,
             )[0]
 
