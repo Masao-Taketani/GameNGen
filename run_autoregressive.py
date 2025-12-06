@@ -155,7 +155,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
 
             # Store all generated latents - split context frames into individual tensors
             initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
-            initial_action_context = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
+            initial_action_context = collate_epi_data["input_ids"][start_idx:start_idx+BUFFER_SIZE].to(device)
             future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
         else:
             parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
