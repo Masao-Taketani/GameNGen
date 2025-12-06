@@ -94,7 +94,7 @@ def generate_single_future_frame(
                         num_inference_steps=num_inference_steps,
                         do_classifier_free_guidance=True,
                         guidance_scale=CFG_GUIDANCE_SCALE,
-                        discretized_noise_level: discretized_noise_level,
+                        discretized_noise_level=discretized_noise_level,
     )
     # The following [(-BUFFER_SIZE + 1) :] index takes the latest BUFFER_SIZE - 1 frames,
     # so that the number of context actions will become BUFFER_SIZE by adding the newest action
@@ -176,6 +176,14 @@ def select_action(turn_left: str,
         action = torch.tensor([0], dtype=torch.int64).to(device)
     return action
 
+def display_init_img(vae, image_processor, img_latent):
+    with torch.inference_mode():
+        img = decode_and_postprocess(
+                 vae=vae, image_processor=image_processor, latents=img_latent
+              )
+    cv2.imshow(f'inference', img)
+    cv2.waitKey(1000)
+
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
          discretized_noise_level: int) -> None:
@@ -199,18 +207,17 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
     turn_left_move_forward = "w" 
     turn_right_move_forward = "r"
     attack = "d"
+
     unet, vae, action_embedding, noise_scheduler = load_model(
         unet_model_folder, vae_model_folder, device=device
     )
+    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
     dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels \
                             else get_epi_files(basepath, file_format="pt")
     ds_length = len(dataset)
     epi_idx = random.sample(range(ds_length), 1)
-
-    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
-    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
-
     episode = dataset[epi_idx]
     epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
     start_idx = random.randint(0, len(epi_data["actions"]) - BUFFER_SIZE)
@@ -219,21 +226,16 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         print("Intializing context pixels and actions")
         epi_data = epi_data.with_transform(preprocess_train)
         collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
-
-        cur_img = show_and_return_init_img(args.init_img_path).to(device)
-
+        
         # Encode initial context frames
         with torch.inference_mode():
             context_latents = encode_conditioning_frames_wo_batch_dim(
                 vae,
                 images=collate_epi_data["pixel_values"],
                 dtype=torch.float32,
-            )
+            ) # [BUFFER_SIZE, 4, 32, 40]
 
-        # Store all generated latents - split context frames into individual tensors
-        context_latents = context_latents  # [BUFFER_SIZE, 4, 32, 40]
-        current_actions = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
-        future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
+        current_actions = collate_epi_data["input_ids"][start_idx:start_idx+BUFFER_SIZE].to(device)
     else:
         print("Intializing context latents and actions")
         parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
@@ -244,11 +246,9 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             device=unet.device,
             dtype=context_latents.dtype,
         )
-
-        cur_img = show_and_return_init_img(args.init_img_path).to(device)
-
         current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
-        future_actions = epi_data["actions"][start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]
+
+    display_init_img(vae, image_processor, context_latents[:-1].unsqueeze(0))
     
     if args.cv2_rec:
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
@@ -274,7 +274,14 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
                                 move_right, move_left, move_forward, turn_left_move_forward, 
                                 turn_right_move_forward, attack, device)
 
-        if args.make_action_log: action_log.append(list(actions))
+        current_actions = torch.cat(
+            [
+                current_actions[(-BUFFER_SIZE + 1) :],
+                torch.tensor([action]).to(device),
+            ]
+        )
+
+        if args.make_action_log: action_log.append(list(action))
 
         future_image, context_latents, current_actions = generate_single_future_frame(
                                                              unet=unet,
