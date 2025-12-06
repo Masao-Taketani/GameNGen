@@ -63,7 +63,7 @@ Built action space of size 20 from buttons
 """
 
 
-def set_seed(seed):
+def set_seed(seed: int):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -118,7 +118,8 @@ def generate_single_future_frame(
                        )
     return future_image, context_latents, current_actions
 
-def get_epi_files(basepath, file_format="pt"):
+def get_epi_files(basepath: str, 
+                  file_format: str = "pt"):
     samples = []
     for dirpath, dirnames, filenames in os.walk(basepath):
         for filename in filenames:
@@ -129,16 +130,25 @@ def get_epi_files(basepath, file_format="pt"):
                     samples.append(os.path.join(dirpath, filename))
     return samples
 
-def load_pt(fpath):
+def load_pt(fpath: str):
     return torch.load(fpath)
 
 def collate_pixels_and_actions(epi_data):
     return {'pixel_values': torch.stack(epi_data['pixel_values']),
             'input_ids': epi_data['input_ids']}
 
-def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
-                  move_right, move_left, move_forward, turn_left_move_forward, turn_right_move_forward,
-                  attack, device):
+def select_action(turn_left: str, 
+                  turn_right: str, 
+                  move_back: str, 
+                  turn_left_move_back: str, 
+                  turn_right_move_back: str,
+                  move_right: str, 
+                  move_left: str, 
+                  move_forward: str, 
+                  turn_left_move_forward: str, 
+                  turn_right_move_forward: str,
+                  attack: str, 
+                  device: torch.device):
     if keyboard.is_pressed(turn_left):
         action = torch.tensor([1], dtype=torch.int64).to(device)
     elif keyboard.is_pressed(turn_right):
@@ -194,19 +204,19 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
     )
 
     dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels \
-                                                             else get_epi_files(basepath, file_format="pt")
+                            else get_epi_files(basepath, file_format="pt")
     ds_length = len(dataset)
-    epi_idx = random.sample(range(ds_length), num_episodes)
+    epi_idx = random.sample(range(ds_length), 1)
 
     vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
     image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
     episode = dataset[epi_idx]
     epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
-    start_idx = random.randint(0, len(epi_data["actions"]) - episode_length - BUFFER_SIZE)
+    start_idx = random.randint(0, len(epi_data["actions"]) - BUFFER_SIZE)
 
     if start_from_pixels:
-        print("Intializing ")
+        print("Intializing context pixels and actions")
         epi_data = epi_data.with_transform(preprocess_train)
         collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
 
@@ -225,6 +235,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         current_actions = collate_epi_data["input_ids"][:BUFFER_SIZE].to(device)
         future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
     else:
+        print("Intializing context latents and actions")
         parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
         context_latents = DiagonalGaussianDistribution(parameters).sample().to(device)
         context_latents = prepare_conditioning_frames(
