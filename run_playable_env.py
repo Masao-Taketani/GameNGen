@@ -77,7 +77,8 @@ def generate_single_future_frame(
     action: int,
     context_latents: torch.Tensor,
     current_actions: torch.Tensor,
-    num_inference_steps: int
+    num_inference_steps: int,
+    discretized_noise_level: int,
 ) -> list[Image]:
     device = unet.device
 
@@ -93,6 +94,7 @@ def generate_single_future_frame(
                         num_inference_steps=num_inference_steps,
                         do_classifier_free_guidance=True,
                         guidance_scale=CFG_GUIDANCE_SCALE,
+                        discretized_noise_level: discretized_noise_level,
     )
     # The following [(-BUFFER_SIZE + 1) :] index takes the latest BUFFER_SIZE - 1 frames,
     # so that the number of context actions will become BUFFER_SIZE by adding the newest action
@@ -165,7 +167,8 @@ def select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_ri
     return action
 
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
-         num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str) -> None:
+         num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
+         discretized_noise_level: int) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -203,6 +206,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
     start_idx = random.randint(0, len(epi_data["actions"]) - episode_length - BUFFER_SIZE)
 
     if start_from_pixels:
+        print("Intializing ")
         epi_data = epi_data.with_transform(preprocess_train)
         collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
 
@@ -271,6 +275,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
                                                              context_latents=context_latents,
                                                              current_actions=current_actions,
                                                              num_inference_steps=num_inference_steps,
+                                                             discretized_noise_level=discretized_noise_level,
                                                          )
 
         cur_img = vae.dec(fut_img_emb)
@@ -326,6 +331,14 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--discretized_noise_level",
+        type=int,
+        default=9,
+        help=(
+            "Discretized noise level used for context images for autoregressive predition."
+        ),
+    )
+    parser.add_argument(
         "--num_inference_steps",
         type=int,
         default=4,
@@ -378,4 +391,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
-         args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext)
+         args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext
+         args.discretized_noise_level)
