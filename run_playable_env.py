@@ -68,6 +68,13 @@ def set_seed(seed: int):
     np.random.seed(seed)
     random.seed(seed)
 
+def decode_latents(vae, image_processor, latents):
+    with torch.inference_mode():
+        image = decode_and_postprocess(
+                    vae=vae, image_processor=image_processor, latents=target_latents
+                )
+    return image
+
 def generate_single_future_frame(
     unet,
     vae,
@@ -112,10 +119,7 @@ def generate_single_future_frame(
         [context_latents[(-BUFFER_SIZE + 1) :], target_latents], dim=0
     )
 
-    with torch.inference_mode():
-        future_image = decode_and_postprocess(
-                            vae=vae, image_processor=image_processor, latents=target_latents
-                       )
+    future_image = decode_latents(vae, image_processor, target_latents)
     return future_image, context_latents, current_actions
 
 def get_epi_files(basepath: str, 
@@ -176,13 +180,20 @@ def select_action(turn_left: str,
         action = torch.tensor([0], dtype=torch.int64).to(device)
     return action
 
+def convert_from_torch_to_numpy(img):
+    img = torch.squeeze(img, 0)
+    img = img.cpu().numpy()
+    img = np.transpose(img, axes=(1, 2, 0))
+    return ((img+1)*127.5).astype(np.uint8)
+
 def display_init_img(vae, image_processor, img_latent):
-    with torch.inference_mode():
-        img = decode_and_postprocess(
-                 vae=vae, image_processor=image_processor, latents=img_latent
-              )
+    img = decode_latents(vae, image_processor, img_latent)
     cv2.imshow(f'inference', img)
     cv2.waitKey(1000)
+
+def render(img):
+    img = convert_from_torch_to_numpy(img)[...,::-1]
+    cv2.imshow(f'inference', img)
 
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
@@ -248,12 +259,13 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         )
         current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
 
-    display_init_img(vae, image_processor, context_latents[:-1].unsqueeze(0))
+    cur_img = context_latents[:-1].unsqueeze(0)
+    display_init_img(vae, image_processor, cur_img)
     
     if args.cv2_rec:
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
         rec_path = rec_path_wo_ext + '.mp4'
-        video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (args.img_size[1], args.img_size[0]))
+        video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (320, 256))
         np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
         video_writer.write(np_img)
     elif args.gif_rec:
@@ -296,7 +308,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
                                                              discretized_noise_level=discretized_noise_level,
                                                          )
 
-        cur_img = vae.dec(fut_img_emb)
+        cur_img = decode_latents(vae, image_processor, future_image)
         render(cur_img)
 
         if args.cv2_rec:
@@ -305,7 +317,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         elif args.gif_rec:
             np_imgs.append(convert_from_torch_to_numpy(cur_img))
 
-        wait = 1/args.max_fps - (time.time() - frame_start_time)
+        wait = 1 / args.max_fps - (time.time() - frame_start_time)
         if num_episode_steps is not None and i == num_episode_steps: break
         i += 1
         if wait > 0: time.sleep(wait)
@@ -346,6 +358,15 @@ if __name__ == "__main__":
         default="rollouts",
         help=(
             "The GIF output dir."
+        ),
+    )
+    parser.add_argument(
+        '--max_fps', 
+        type=int, 
+        default=30,
+        help=(
+            "Maximum number of FPS. The FPS the generation model produce can not exceed the "
+            "one you specify here."
         ),
     )
     parser.add_argument(
