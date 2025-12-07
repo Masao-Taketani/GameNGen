@@ -284,4 +284,4 @@ if __name__ == "__main__":
     set_seed(args.seed)
     main(args.dataset_basepath, args.num_episodes, args.episode_length, 
          args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
-         args.num_inference_steps, args.gif_outdir, discretized_noise_level)
+         args.num_inference_steps, args.gif_outdir, args.discretized_noise_level)
