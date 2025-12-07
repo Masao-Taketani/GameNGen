@@ -47,7 +47,8 @@ def generate_rollout(
     actions: list[int],
     initial_frame_context: torch.Tensor,
     initial_action_context: torch.Tensor,
-    num_inference_steps: int
+    num_inference_steps: int,
+    discretized_noise_level: int,
 ) -> list[Image]:
     device = unet.device
     all_latents = []
@@ -67,6 +68,7 @@ def generate_rollout(
             num_inference_steps=num_inference_steps,
             do_classifier_free_guidance=True,
             guidance_scale=CFG_GUIDANCE_SCALE,
+            discretized_noise_level=discretized_noise_level,
         )
         all_latents.append(target_latents)
         current_actions = torch.cat(
@@ -116,7 +118,8 @@ def collate_pixels_and_actions(epi_data):
 
 
 def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folder: str, 
-         vae_model_folder: str, start_from_pixels: bool, num_inference_steps: int, outdir: str) -> None:
+         vae_model_folder: str, start_from_pixels: bool, num_inference_steps: int, outdir: str,
+         discretized_noise_level: int) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -179,6 +182,7 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             initial_frame_context=initial_frame_context,
             initial_action_context=initial_action_context,
             num_inference_steps=num_inference_steps,
+            discretized_noise_level=discretized_noise_level,
         )
 
         os.makedirs(outdir, exist_ok=True)
@@ -218,13 +222,20 @@ if __name__ == "__main__":
             "The GIF output dir."
         ),
     )
-    
     parser.add_argument(
         "--num_inference_steps",
         type=int,
         default=4,
         help=(
             "The number of inference steps to generate for each frame."
+        ),
+    )
+    parser.add_argument(
+        "--discretized_noise_level",
+        type=int,
+        default=9,
+        help=(
+            "Discretized noise level used for context images for autoregressive predition."
         ),
     )
     parser.add_argument(
@@ -273,4 +284,4 @@ if __name__ == "__main__":
     set_seed(args.seed)
     main(args.dataset_basepath, args.num_episodes, args.episode_length, 
          args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
-         args.num_inference_steps, args.gif_outdir)
+         args.num_inference_steps, args.gif_outdir, discretized_noise_level)
