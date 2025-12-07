@@ -195,9 +195,14 @@ def render(img):
     img = convert_from_torch_to_numpy(img)[...,::-1]
     cv2.imshow(f'inference', img)
 
+def create_action_log(action_log_dir, action_log):
+    os.makedirs(action_log_dir, exist_ok=True)
+    np.savez_compressed(os.path.join(action_log_dir, 'action_log'), actions=np.array(action_log))
+    print(f"Action log is created at '{action_log_dir}'.")
+
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
-         discretized_noise_level: int) -> None:
+         discretized_noise_level: int, action_log_dir: str) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -272,8 +277,8 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         np_imgs = []
         np_imgs.append(convert_from_torch_to_numpy(cur_img))
 
-    if args.make_action_log:
-        os.makedirs(args.action_log_dir, exist_ok=True)
+    if action_log_dir:
+        os.makedirs(action_log_dir, exist_ok=True)
         action_log = []
 
     i = 0
@@ -293,7 +298,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             ]
         )
 
-        if args.make_action_log: action_log.append(list(action))
+        if action_log_dir: action_log.append(list(action))
 
         future_image, context_latents, current_actions = generate_single_future_frame(
                                                              unet=unet,
@@ -330,7 +335,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         pil_imgs[0].save(rec_path, save_all=True, append_images=pil_imgs[1:], 
                 optimize=False, duration=20, loop=0)
 
-    if args.make_action_log: create_action_log(args, action_log)
+    if action_log_dir: create_action_log(action_log_dir, action_log)
 
 
 if __name__ == "__main__":
@@ -413,10 +418,9 @@ if __name__ == "__main__":
             "The number of action dim the RL agent has trained with."
         ),
     )
-    parser.add_argument('--make_action_log', action='store_true')
-    parser.add_argument('--action_log_dir', type=str, default='action_log_dir', 
-                        help='When make_action_log flag is used, you need to specify \
-                              a directory path to save the action log.')
+    parser.add_argument('--action_log_dir', type=str, default=None, 
+                        help='If you would like to save the action log, you need to specify a directory path \
+                              to save the log. Otherwise, it is not recorded.')
     parser.add_argument(
         "--seed", 
         type=int, 
@@ -431,4 +435,4 @@ if __name__ == "__main__":
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
          args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext
-         args.discretized_noise_level)
+         args.discretized_noise_level, args.action_log_dir)
