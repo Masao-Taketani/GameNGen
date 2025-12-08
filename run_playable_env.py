@@ -202,7 +202,7 @@ def create_action_log(action_log_dir, action_log):
 
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
-         discretized_noise_level: int, action_log_dir: str) -> None:
+         discretized_noise_level: int, action_log_dir: str, conduct_headless_test: bool) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -265,7 +265,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
 
     cur_img = context_latents[:-1].unsqueeze(0)
-    display_init_img(vae, image_processor, cur_img)
+    if not conduct_headless_test: display_init_img(vae, image_processor, cur_img)
     
     if args.cv2_rec:
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
@@ -314,7 +314,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
                                                          )
 
         cur_img = decode_latents(vae, image_processor, future_image)
-        render(cur_img)
+        if not conduct_headless_test: render(cur_img)
 
         if args.cv2_rec:
             np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
@@ -341,6 +341,13 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run inference with customizable parameters"
+    )
+    parser.add_argument(
+        "--conduct_headless_test",
+        action="store_true",
+        help=(
+            "If you don't have GPUs locally, use this flag to test the script. "
+        ),
     )
     parser.add_argument(
         "--start_from_pixels",
@@ -435,4 +442,4 @@ if __name__ == "__main__":
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
          args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext
-         args.discretized_noise_level, args.action_log_dir)
+         args.discretized_noise_level, args.action_log_dir, args.conduct_headless_test)
