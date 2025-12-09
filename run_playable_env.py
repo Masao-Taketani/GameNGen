@@ -81,7 +81,6 @@ def generate_single_future_frame(
     action_embedding,
     noise_scheduler,
     image_processor,
-    action: int,
     context_latents: torch.Tensor,
     current_actions: torch.Tensor,
     num_inference_steps: int,
@@ -103,15 +102,6 @@ def generate_single_future_frame(
                         guidance_scale=CFG_GUIDANCE_SCALE,
                         discretized_noise_level=discretized_noise_level,
     )
-    # The following [(-BUFFER_SIZE + 1) :] index takes the latest BUFFER_SIZE - 1 frames,
-    # so that the number of context actions will become BUFFER_SIZE by adding the newest action
-    # command. 
-    current_actions = torch.cat(
-        [
-            current_actions[(-BUFFER_SIZE + 1) :],
-            torch.tensor([action]).to(device),
-        ]
-    )
 
     # Update context latents using sliding window
     # Always take exactly BUFFER_SIZE most recent frames
@@ -120,7 +110,7 @@ def generate_single_future_frame(
     )
 
     future_image = decode_latents(vae, image_processor, target_latents)
-    return future_image, context_latents, current_actions
+    return future_image, context_latents
 
 def get_epi_files(basepath: str, 
                   file_format: str = "pt"):
@@ -202,7 +192,8 @@ def create_action_log(action_log_dir, action_log):
 
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
-         discretized_noise_level: int, action_log_dir: str, conduct_headless_test: bool) -> None:
+         discretized_noise_level: int, action_log_dir: str, conduct_headless_test: bool,
+         action_key_for_headless: int) -> None:
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
@@ -287,9 +278,12 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
 
         if keyboard.is_pressed('q'): break
 
-        action = select_action(turn_left, turn_right, move_back, turn_left_move_back, turn_right_move_back,
-                                move_right, move_left, move_forward, turn_left_move_forward, 
-                                turn_right_move_forward, attack, device)
+        if conduct_headless_test:
+            action = torch.tensor([action_key_for_headless], dtype=torch.int64).to(device)
+        else:
+            action = select_action(turn_left, turn_right, move_back, turn_left_move_back, 
+                                    turn_right_move_back, move_right, move_left, move_forward, 
+                                    turn_left_move_forward, turn_right_move_forward, attack, device)
 
         current_actions = torch.cat(
             [
@@ -300,18 +294,17 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
 
         if action_log_dir: action_log.append(list(action))
 
-        future_image, context_latents, current_actions = generate_single_future_frame(
-                                                             unet=unet,
-                                                             vae=vae,
-                                                             action_embedding=action_embedding,
-                                                             noise_scheduler=noise_scheduler,
-                                                             image_processor=image_processor,
-                                                             actions=future_actions,
-                                                             context_latents=context_latents,
-                                                             current_actions=current_actions,
-                                                             num_inference_steps=num_inference_steps,
-                                                             discretized_noise_level=discretized_noise_level,
-                                                         )
+        future_image, context_latents = generate_single_future_frame(
+                                            unet=unet,
+                                            vae=vae,
+                                            action_embedding=action_embedding,
+                                            noise_scheduler=noise_scheduler,
+                                            image_processor=image_processor,
+                                            context_latents=context_latents,
+                                            current_actions=current_actions,
+                                            num_inference_steps=num_inference_steps,
+                                            discretized_noise_level=discretized_noise_level,
+                                        )
 
         cur_img = decode_latents(vae, image_processor, future_image)
         if not conduct_headless_test: render(cur_img)
@@ -346,7 +339,16 @@ if __name__ == "__main__":
         "--conduct_headless_test",
         action="store_true",
         help=(
-            "If you don't have GPUs locally, use this flag to test the script. "
+            "If you don't have a GPU locally and have it remotely, use this flag to test the script ",
+            "remotely."
+        ),
+    )
+    parser.add_argument(
+        '--action_key_for_headless', 
+        type=int, 
+        default=11,
+        help=(
+            "If `conduct_headless_test` is True, specify an action key to use it repeatly."
         ),
     )
     parser.add_argument(
@@ -442,4 +444,5 @@ if __name__ == "__main__":
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
          args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext
-         args.discretized_noise_level, args.action_log_dir, args.conduct_headless_test)
+         args.discretized_noise_level, args.action_log_dir, args.conduct_headless_test, 
+         args.action_key_for_headless)
