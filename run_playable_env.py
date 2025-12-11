@@ -224,7 +224,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
     dataset = get_epi_files(basepath, file_format="parquet") if start_from_pixels \
                             else get_epi_files(basepath, file_format="pt")
     ds_length = len(dataset)
-    epi_idx = random.sample(range(ds_length), 1)
+    epi_idx = random.sample(range(ds_length), 1)[0]
     episode = dataset[epi_idx]
     epi_data = Dataset.from_parquet(episode) if start_from_pixels else load_pt(episode)
     start_idx = random.randint(0, len(epi_data["actions"]) - BUFFER_SIZE)
@@ -367,14 +367,6 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
-        "--gif_outdir",
-        type=str,
-        default="rollouts",
-        help=(
-            "The GIF output dir."
-        ),
-    )
-    parser.add_argument(
         '--max_fps', 
         type=int, 
         default=30,
@@ -443,6 +435,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
-         args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext
+         args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext,
          args.discretized_noise_level, args.action_log_dir, args.conduct_headless_test, 
          args.action_key_for_headless)
