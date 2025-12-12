@@ -233,6 +233,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         print("Intializing context pixels and actions")
         epi_data = epi_data.with_transform(preprocess_train)
         collate_epi_data = collate_pixels_and_actions(epi_data[start_idx:start_idx+BUFFER_SIZE])
+        init_img = collate_epi_data["pixel_values"][-1]
         
         # Encode initial context frames
         with torch.inference_mode():
@@ -247,6 +248,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         print("Intializing context latents and actions")
         parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
         context_latents = DiagonalGaussianDistribution(parameters).sample().to(device)
+        init_img = decode_latents(vae, image_processor, context_latents)
         context_latents = prepare_conditioning_frames(
             vae,
             latents=context_latents,
@@ -255,18 +257,17 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         )
         current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
 
-    cur_img = context_latents[:-1].unsqueeze(0)
-    if not conduct_headless_test: display_init_img(vae, image_processor, cur_img)
+    if not conduct_headless_test: display_init_img(vae, image_processor, init_img)
     
     if args.cv2_rec:
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
         rec_path = rec_path_wo_ext + '.mp4'
         video_writer = cv2.VideoWriter(rec_path, fourcc, 10.0, (320, 256))
-        np_img = convert_from_torch_to_numpy(cur_img)[...,::-1]
+        np_img = convert_from_torch_to_numpy(init_img)[...,::-1]
         video_writer.write(np_img)
     elif args.gif_rec:
         np_imgs = []
-        np_imgs.append(convert_from_torch_to_numpy(cur_img))
+        np_imgs.append(convert_from_torch_to_numpy(init_img))
 
     if action_log_dir:
         os.makedirs(action_log_dir, exist_ok=True)
