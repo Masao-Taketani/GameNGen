@@ -33,6 +33,7 @@ Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt
   - [x] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters with multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668)
   - [x] Pad every image frame to get 320x256 from 320x240
   - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes when creating each training sample
+  - [x] Make conditioning noise level adjustable
 - [x] Efficient Diffusion Training
   - [x] Convert image dataset into latent embedding one and train only using the embeddings from the beginning, not handling image dataset at all during the training
   - [x] Convert dataset file format from `.parquet` (for images & actions) to `.pt` (for latent embeddings & actions) to directly handle Torch tensors to train
