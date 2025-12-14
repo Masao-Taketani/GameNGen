@@ -143,6 +143,7 @@ Here are the explanations of arguments that are used when executing.
 - unet_model_folder (str): Specify your trained U-net folder
 - vae_ft_model_folder (str): Specify your finetuned VAE folder
 - num_inference_steps (int): Number of inference steps to generate each frame
+- discretized_noise_level (int): Discretized noise level used for noise augmentation. It takes values from 0 to 9 where 0 means the model is conditioned on the info that the smallest noise is added and 9 means the largest noise is added
 
 
 ```
