@@ -1,4 +1,4 @@
-# Diffusion Models Are Real-Time Game Engines
+# Diffusion Models Are Real-Time Game Engines reproduced by Masao Taketani
 
 <div align="center">
   <img src="assets/rollout_5555.gif">
