@@ -53,6 +53,12 @@ All trained models except the policy model for VizDoom, which is located in `ViZ
 - [Finetuned Decoder](https://huggingface.co/Masao-Taketani/vizdoom-finetuned-decoder)
 - [Diffusion Model](https://huggingface.co/Masao-Taketani/vizdoom-diffusion-dynamic-model)
 
+## Dataset
+
+The dataset I provide here is just for inference because the training dataset is too huge to upload HF Hub. As for training dataset, you should generate it locally with the script written at `Generate training data for diffusion models while training an RL agent`
+
+- [Dataset used during inference](Masao-Taketani/vizdoom-inference-dataset)
+
 ## Scripts
 
 ### Generate training data for diffusion models while training an RL agent 
