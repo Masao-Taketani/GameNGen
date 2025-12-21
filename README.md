@@ -110,6 +110,9 @@ sh train_diffusion_scripts/single_gpu_latents.sh
 ```
 
 #### Multiple GPUs
+> [!WARNING]
+> Even if you have mutiple GPUs available, the bottleneck for training performance is currently the data loading part. So, you may not efficiently be able to train the model. Thus, I totally recommend training it with single GPU at first.
+
 If you have more than single GPU, after modifying some arguments(such as dataset path) of `train_diffusion_scripts/multi_gpus_latents.sh`, follow the instruction below to train the diffusion model.
 ```
 sh train_diffusion_scripts/multi_gpus_latents.sh
