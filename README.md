@@ -1,5 +1,10 @@
 # Diffusion Models Are Real-Time Game Engines
 
+<p align="center">
+  <img src="assets/rollout_5555.gif">
+  <img src="assets/rollout_654.gif">
+</p>
+
 This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I have referred to [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main) in order to create this repo.
 
 ## Modifications
@@ -40,7 +45,7 @@ Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt
 
 ## Trained Models
 
-All trained models except the policy model trained for VizDoom, which is located in `ViZDoomPPO/logs/models/deathmatch_simple/best_model.zip`, are available on Hugging Face Hub:
+All trained models except the policy model for VizDoom, which is located in `ViZDoomPPO/logs/models/deathmatch_simple/best_model.zip`, are available on Hugging Face Hub:
 
 - [Finetuned Decoder](https://huggingface.co/Masao-Taketani/vizdoom-finetuned-decoder)
 - [Diffusion Model]()
@@ -103,7 +108,7 @@ sh train_diffusion_scripts/single_gpu_latents.sh
 
 #### Multiple GPUs
 > [!WARNING]
-> Even if you have mutiple GPUs available, the bottleneck for training speed is currently the data loading part. So, you may not efficiently be able to train the model. Thus, I totally recommend training it with single GPU at first.
+> As for the diffusion model training, even if you have mutiple GPUs available, the bottleneck for training speed is currently the data loading part. So, you may not efficiently be able to train the model with multiple GPUs. Thus, I totally recommend training it with single GPU at first.
 
 If you have more than single GPU, after modifying some arguments(such as dataset path) of `train_diffusion_scripts/multi_gpus_latents.sh`, follow the instruction below to train the diffusion model.
 ```
