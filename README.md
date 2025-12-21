@@ -38,20 +38,12 @@ Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt
   - [x] Convert image dataset into latent embedding one and train only using the embeddings from the beginning, not handling image dataset at all during the training so that you can much more effectively utilize GPU memory and use much larger batch size 
   - [x] Convert dataset file format from `.parquet` (for images & actions) to `.pt` (for latent embeddings & actions) to directly handle Torch tensors to train
 
-## Artifacts
+## Trained Models
 
-All artifacts are available on Hugging Face Hub:
+All trained models except the policy model trained for VizDoom, which is located in `ViZDoomPPO/logs/models/deathmatch_simple/best_model.zip`, are available on Hugging Face Hub:
 
-Checkpoints:
-- [gameNgen-baseline-20ksteps](https://huggingface.co/arnaudstiegler/gameNgen-baseline-20ksteps)
-- [sd-model-gameNgen-60ksteps](https://huggingface.co/arnaudstiegler/sd-model-gameNgen-60ksteps)
-
-Datasets:
-- [vizdoom-5-episodes-skipframe-4-lvl5](https://huggingface.co/arnaudstiegler/vizdoom-5-episodes-skipframe-4-lvl5)
-- [vizdoom-500-episodes-skipframe-4-lvl5](https://huggingface.co/arnaudstiegler/vizdoom-500-episodes-skipframe-4-lvl5)
-
-Vizdoom Agent:
-- `ViZDoomPPO/logs/models/deathmatch_simple/best_model.zip` (local)
+- [Finetuned Decoder](https://huggingface.co/Masao-Taketani/vizdoom-finetuned-decoder)
+- [Diffusion Model]()
 
 ## Scripts
 
