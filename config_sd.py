@@ -23,13 +23,14 @@ NUM_BUCKETS = 10
 
 PRETRAINED_MODEL_NAME_OR_PATH = "CompVis/stable-diffusion-v1-4"
 
-# Repo name for dumping model artifacts
-REPO_NAME = "arnaudstiegler/sd-model-gameNgen"
+# Repo name for dumping model artifacts (used when `push_to_hub` is True)
+REPO_NAME = "Enter your HF repo name here"
 
 # When not using frame conditioning, we use this prompt
 VALIDATION_PROMPT = "video game doom image, high quality, 4k, high resolution"
 
-# Datasets
+# Although I leave arnaudstiegler's datasets here, I totally recommend creating dataset with `ViZDoomPPO/train_ppo_and_collect_data_parallel.py`
+# since the datasets below do not include many episodes
 TRAINING_DATASET_DICT = {
     "small": "arnaudstiegler/vizdoom-5-episodes-skipframe-4-lvl5",
     "large": "arnaudstiegler/vizdoom-500-episodes-skipframe-4-lvl5",

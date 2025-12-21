@@ -171,7 +171,7 @@ def load_model(
     Args:
         unet_model_folder: the folder to load the non-vae models and configs from, can be a model id or a local folder
         vae_model_folder: the folder to load the vae model from, can be a model id or a local folder.
-                          If None, use the 'arnaudstiegler/game-n-gen-vae-finetuned' is used.
+                          If None, use the `Masao-Taketani/vizdoom-finetuned-decoder` is used.
     """
     embedding_info = load_embedding_info_dict(unet_model_folder)
     action_embedding = load_action_embedding(
@@ -183,7 +183,7 @@ def load_model(
         unet_model_folder, subfolder="noise_scheduler"
     )
 
-    vae = get_vae(vae_model_folder) if vae_model_folder else get_vae("arnaudstiegler/game-n-gen-vae-finetuned")
+    vae = get_vae(vae_model_folder) if vae_model_folder else get_vae("Masao-Taketani/vizdoom-finetuned-decoder")
     unet = UNet2DConditionModel.from_pretrained(unet_model_folder, subfolder="unet")
 
     assert (
