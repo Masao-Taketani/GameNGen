@@ -55,7 +55,7 @@ All trained models except the policy model for VizDoom, which is located in `ViZ
 
 ## Dataset
 
-The datasets I provide here are just for inference because the training dataset is too huge to upload to HF Hub. As for training dataset, you should generate it locally with the script written at `Generate training data for diffusion models while training an RL agent`.
+The datasets I provide here are meant just for inference because the original training dataset is too large to upload to HF Hub. As for training dataset, you should generate it locally with the script written at `Generate training data for diffusion models while training an RL agent`, but with the datasets provided here, you can also check how the training scripts work before seriously conducting the heavy lifting.
 
 - [Pixel image dataset used during inference](https://huggingface.co/datasets/Masao-Taketani/vizdoom-inference-pixel-dataset)
 - [Latent image dataset used during inference](https://huggingface.co/datasets/Masao-Taketani/vizdoom-inference-latent-dataset)
