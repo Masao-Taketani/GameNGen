@@ -9,6 +9,9 @@
 > [!WARNING]
 > The quality of the model is assumed to be far from the original one, but I am releasing this repo because I am resigning from my current position at the company, HEROZ, Inc., which has let me use their GPU resource for my personal R&D. So, big thanks to them!
 
+> [!NOTE]
+> If you would just like to check the behavior of the trained model, skip to [Run autoregressive inference](#run-autoregressive-inference). Necessary steps to run the inference code is written there.
+
 This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I have referred to [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main) in order to create this repo.
 
 ## Modifications
