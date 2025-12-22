@@ -160,6 +160,9 @@ def main(basepath: str, num_episodes: int, episode_length: int, unet_model_folde
             initial_frame_context = context_latents  # [BUFFER_SIZE, 4, 32, 40]
             initial_action_context = collate_epi_data["input_ids"][start_idx:start_idx+BUFFER_SIZE].to(device)
             future_actions = epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]
+            # One-action-allowed test
+            #future_actions = torch.ones_like(epi_data[start_idx+BUFFER_SIZE:start_idx+BUFFER_SIZE+episode_length]["input_ids"]) * 11
+            #print("future_actions", future_actions)
         else:
             parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
             initial_frame_context = DiagonalGaussianDistribution(parameters).sample().to(device)
@@ -211,7 +214,7 @@ if __name__ == "__main__":
         "--dataset_basepath",
         type=str,
         help=(
-            "The latent dataset base path pointing a folder containing pt files."
+            "The pixel/latent dataset base path pointing a folder containing parquet/pt files."
         ),
     )
     parser.add_argument(
@@ -241,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_episodes",
         type=int,
-        default=20,
+        default=3,
         help=(
             "The number of episodes to generate."
         ),
@@ -257,12 +260,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--unet_model_folder",
         type=str,
+        default="Masao-Taketani/vizdoom-diffusion-dynamic-model",
         help="Path to the folder containing the trained Unet model weights",
     )
     parser.add_argument(
         "--vae_ft_model_folder",
         type=str,
-        default=None,
+        default="Masao-Taketani/vizdoom-finetuned-decoder",
         help="Path to the folder containing the finetuned VAE model weights. "
              "If None, use the 'arnaudstiegler/game-n-gen-vae-finetuned' is used.",
     )
