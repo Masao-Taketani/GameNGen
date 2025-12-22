@@ -172,6 +172,8 @@ Here are the explanations of arguments that are used when executing.
 python run_autoregressive.py --dataset_basepath [your parquet or pt path] --num_episodes [mumber of episodes] --episode_length [number of steps] --unet_model_folder [your unet folder] --vae_ft_model_folder [your vae folder] --num_inference_steps [number of inference steps] --discretized_noise_level [noise level used for noise augmentation] ([optional boolean flag] --start_from_pixels)
 ```
 
+The generated images are saved as a GIF for each episode in the folder named `rollouts` by default, but you can modify the output directory with an argument named `gif_outdir`.
+
 ## References
 
 ### Paper
