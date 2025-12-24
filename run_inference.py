@@ -204,12 +204,12 @@ def next_latent(
 
 
 def decode_and_postprocess(
-    vae: AutoencoderKL, image_processor: VaeImageProcessor, latents: torch.Tensor
+    vae: AutoencoderKL, image_processor: VaeImageProcessor, latents: torch.Tensor, output_type="pil"
 ) -> Image:
     image = vae.decode(latents / vae.config.scaling_factor, return_dict=False)[0]
 
     image = image_processor.postprocess(
-        image.detach(), output_type="pil", do_denormalize=[True] * image.shape[0]
+        image.detach(), output_type=output_type, do_denormalize=[True] * image.shape[0]
     )[0]
     return image
 

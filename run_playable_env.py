@@ -71,7 +71,10 @@ def set_seed(seed: int):
 def decode_latents(vae, image_processor, latents):
     with torch.inference_mode():
         image = decode_and_postprocess(
-                    vae=vae, image_processor=image_processor, latents=target_latents
+                    vae=vae, 
+                    image_processor=image_processor, 
+                    latents=latents, 
+                    output_type="pt"
                 )
     return image
 
@@ -174,7 +177,7 @@ def convert_from_torch_to_numpy(img):
     img = torch.squeeze(img, 0)
     img = img.cpu().numpy()
     img = np.transpose(img, axes=(1, 2, 0))
-    return ((img+1)*127.5).astype(np.uint8)
+    return (np.clip((img)*255.0, 0.0, 255.0)).astype(np.uint8)
 
 def display_init_img(vae, image_processor, img_latent):
     img = decode_latents(vae, image_processor, img_latent)
@@ -275,9 +278,10 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
 
     i = 0
     while True:
+        print(f"step: {i+1}")
         frame_start_time = time.time()
 
-        if keyboard.is_pressed('q'): break
+        if not conduct_headless_test and keyboard.is_pressed('q'): break
 
         if conduct_headless_test:
             action = torch.tensor([action_key_for_headless], dtype=torch.int64).to(device)
@@ -293,7 +297,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             ]
         )
 
-        if action_log_dir: action_log.append(list(action))
+        if action_log_dir: action_log.append(action.to("cpu").item())
 
         future_image, context_latents = generate_single_future_frame(
                                             unet=unet,
@@ -307,7 +311,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
                                             discretized_noise_level=discretized_noise_level,
                                         )
 
-        cur_img = decode_latents(vae, image_processor, future_image)
+        cur_img = future_image
         if not conduct_headless_test: render(cur_img)
 
         if args.cv2_rec:
@@ -317,8 +321,8 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             np_imgs.append(convert_from_torch_to_numpy(cur_img))
 
         wait = 1 / args.max_fps - (time.time() - frame_start_time)
-        if num_episode_steps is not None and i == num_episode_steps: break
         i += 1
+        if num_episode_steps is not None and i == num_episode_steps: break
         if wait > 0: time.sleep(wait)
 
     if args.gif_rec:
@@ -327,7 +331,7 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             pil_imgs.append(Image.fromarray(img))
         rec_path = rec_path_wo_ext + '.gif'
         pil_imgs[0].save(rec_path, save_all=True, append_images=pil_imgs[1:], 
-                optimize=False, duration=20, loop=0)
+                optimize=False, duration=40, loop=0)
 
     if action_log_dir: create_action_log(action_log_dir, action_log)
 
@@ -403,12 +407,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--unet_model_folder",
         type=str,
+        default="Masao-Taketani/vizdoom-diffusion-dynamic-model",
         help="Path to the folder containing the trained Unet model weights",
     )
     parser.add_argument(
         "--vae_ft_model_folder",
         type=str,
-        default=None,
+        default="Masao-Taketani/vizdoom-finetuned-decoder",
         help="Path to the folder containing the finetuned VAE model weights. "
              "If None, use the 'arnaudstiegler/game-n-gen-vae-finetuned' is used.",
     )
