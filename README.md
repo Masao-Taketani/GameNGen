@@ -142,7 +142,7 @@ sh finetune_vae_scripts/multi_gpus.sh
 ### Run autoregressive inference
 
 > [!TIP]
-> Since the memory requirement gets bigger if you start with pixels instead of latents, I recommend not raising the flag `start_from_pixels` if you don't have good amount of VRAM.
+> Since the memory requirement gets bigger if you start with pixels instead of latents, I recommend not raising the flag `--start_from_pixels` if you don't have good amount of VRAM.
 
 If you would just like to see how the trained model behave, download either pixel or latent inference dataset to run the autoregressive inference script.
 
@@ -160,7 +160,7 @@ The following command will generate rollouts, where each new frame is generated 
 We initially fill the buffer using 64 frames of training data and their corresponding actions, and only use actions from the dataset after that (i.e it matches what the agent did in the episode).
 Here are the explanations of arguments that are used when executing.
 - start_from_pixels (store_true): Start autoregressive inference using original pixel images. If not raised, the program starts autoregressive inference using latent images
-- dataset_basepath (str): Specify your parquet directory path if `start_from_pixels` flag is raised. Otherwise, specify your pt directory path
+- dataset_basepath (str): Specify your parquet directory path if `--start_from_pixels` flag is raised. Otherwise, specify your pt directory path
 - num_episodes (int): Total number of episodes to generate
 - episode_length (int): Total steps for each episode to generate
 - unet_model_folder (str): Specify your trained U-net folder. If not specified, the code will download the trained diffusion model 
@@ -174,6 +174,31 @@ python run_autoregressive.py --dataset_basepath [your parquet or pt path] --num_
 ```
 
 The generated images are saved as a GIF for each episode in the folder named `rollouts` by default, but you can modify the output directory with an argument named `gif_outdir`.
+
+### Run playable environment
+
+You can also run the playable environment. In oder to do that, you need additional installation of the following modules.
+```
+apt -y update
+apt -y install libopencv-dev
+pip install keyboard
+```
+
+After the installation, use the following command to start running the playable environment.
+
+> [!WARNING]
+> If you are running the command remotely without a monitor, always use `--conduct_headless_test` argument to just test the script. In this case, you can also use `--action_key_for_headless` argument to specify an action key to use it repeatly without a monitor.
+
+```
+python run_playable_env.py --conduct_headless_test --dataset_basepath [your parquet or pt path] --num_inference_steps [number of inference steps] --num_episode_steps [number of steps] --gif_rec --action_log_dir action_log_dir --action_key_for_headless 10
+```
+
+Optionally, you can save the rollout as video (mp4) or GIF and also the action log you used for the rollout. Please refer to the following explanation.
+- `--cv2_rec`: A mp4 file is saved
+- `--gif_rec`: A GIF file is saved
+- `--rec_path_wo_ext`: A base file name to be used for recording (without file extension)
+- `--action_log_dir`: A directory path to save the action log. If None, it is not saved (default)
+
 
 ## References
 
