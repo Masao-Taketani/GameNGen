@@ -190,13 +190,13 @@ After the installation, use the following command to start running the playable 
 > If you are running the command remotely without a monitor, always use `--conduct_headless_test` argument to just test the script. In this case, you can also use `--action_key_for_headless` argument to specify an action key to use it repeatly without a monitor.
 
 ```
-python run_playable_env.py --conduct_headless_test --dataset_basepath [your parquet or pt path] --num_inference_steps [number of inference steps] --num_episode_steps [number of steps] --gif_rec --action_log_dir action_log_dir --action_key_for_headless 10
+python run_playable_env.py --dataset_basepath [your parquet or pt path] --num_inference_steps [number of inference steps] --num_episode_steps [number of steps]
 ```
 
-Optionally, you can save the rollout as video (mp4) or GIF and also the action log you used for the rollout. Please refer to the following explanation.
+Optionally, you can save the rollout as video (mp4) or GIF and also the action log you used for the rollout. Please refer to the following argument explanation.
 - `--cv2_rec`: A mp4 file is saved
 - `--gif_rec`: A GIF file is saved
-- `--rec_path_wo_ext`: A base file name to be used for recording (without file extension)
+- `--rec_path_wo_ext`: A base file name to be used to save the recording (without file extension)
 - `--action_log_dir`: A directory path to save the action log. If None, it is not saved (default)
 
 
