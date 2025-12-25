@@ -1,0 +1,12 @@
+python finetune_autoencoder.py \
+    --dataset_basepath {input your parquet dataset path here} \
+    --batch_size 40 \
+    --num_workers 16 \
+    --use_adamw \
+    --lr_scheduler cosine_with_warmup \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-5 \
+    --chunk_id_interval 5000 \
+    --output_dir {input your output folder path here} \
+    --report_to wandb \
+    --wandb_name {input your wandb name here}

@@ -12,6 +12,9 @@
 > [!NOTE]
 > If you would just like to check the behavior of the trained models, skip to [Run autoregressive inference](#run-autoregressive-inference) or [Run playable environment](#run-playable-environment). The necessary steps to run the inference codes are written there.
 
+> [!NOTE]
+> For this experiment, I have used one or two NVIDIA A100 80GB GPU(s). So, please change the batch size or other settings written on the diffusion training scripts if you don't have the same GPU(s).
+
 This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I have referred to [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main) in order to create this repo.
 
 ## Modifications
@@ -130,7 +133,10 @@ sh train_diffusion_scripts/multi_gpus_latents.sh
 ### Train the auto-encoder
 
 #### Single GPU
-I haven't tried with single GPU for this section yet. To be updated.
+After modifying some arguments (such as dataset path) of `finetune_vae_scripts/single_gpus.sh`, follow the instruction below to finetune the decoder of VAE.
+```
+sh finetune_vae_scripts/single_gpus.sh
+```
 
 #### Multiple GPUs
 If you have more than single GPU, after modifying some arguments (such as dataset path) of `finetune_vae_scripts/multi_gpus.sh`, follow the instruction below to finetune the decoder of VAE.
