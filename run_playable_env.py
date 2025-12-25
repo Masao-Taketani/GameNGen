@@ -177,16 +177,12 @@ def convert_from_torch_to_numpy(img):
     img = torch.squeeze(img, 0)
     img = img.cpu().numpy()
     img = np.transpose(img, axes=(1, 2, 0))
-    return (np.clip((img)*255.0, 0.0, 255.0)).astype(np.uint8)
+    return (np.clip(img*255.0, 0.0, 255.0)).astype(np.uint8)
 
-def display_init_img(vae, image_processor, img_latent):
-    img = decode_latents(vae, image_processor, img_latent)
-    cv2.imshow(f'inference', img)
-    cv2.waitKey(1000)
-
-def render(img):
+def render(img, is_init=False):
     img = convert_from_torch_to_numpy(img)[...,::-1]
     cv2.imshow(f'inference', img)
+    if is_init: cv2.waitKey(1000)
 
 def create_action_log(action_log_dir, action_log):
     os.makedirs(action_log_dir, exist_ok=True)
@@ -259,8 +255,8 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
             dtype=context_latents.dtype,
         )
         current_actions = epi_data["actions"][start_idx:start_idx+BUFFER_SIZE].to(device)
-
-    if not conduct_headless_test: display_init_img(vae, image_processor, init_img)
+    
+    if not conduct_headless_test: render(init_img, is_init=True)
     
     if args.cv2_rec:
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
