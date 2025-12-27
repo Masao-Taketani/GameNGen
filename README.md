@@ -47,6 +47,7 @@ Although `--log-opt max-file` is optional, I strongly recommend using `--log-opt
   - [x] Wrap `unet` and `action_embedding` as one model in order to synchronize those two models' parameters for multi-gpu training. For more details, refer to the [issue](https://github.com/huggingface/accelerate/issues/668#issuecomment-1574438411)
   - [x] Pad every image frame to get 320x256 from 320x240
   - [x] Create dataloader that makes sure it won't pick frames from two distinct episodes when creating each training sample
+  - [x] Zero out conditioning images in latent space instead of image space for CFG
   - [x] Make conditioning noise level adjustable during inference
 - [x] Efficient Diffusion Training
   - [x] Convert image dataset into latent embedding one and train only using the embeddings from the beginning, not handling image dataset at all during the training so that you can much more effectively utilize GPU memory and use much larger batch size 
