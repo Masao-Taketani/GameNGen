@@ -250,6 +250,8 @@ def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_fro
         print("Intializing context latents and actions")
         parameters = epi_data["parameters"][start_idx:start_idx+BUFFER_SIZE]
         context_latents = DiagonalGaussianDistribution(parameters).sample().to(device)
+        # The multiplication below is done for the sake of utilzing the same function during inference
+        context_latents *= vae.config.scaling_factor
         init_img = decode_latents(vae, image_processor, context_latents)
         context_latents = prepare_conditioning_frames(
             vae,
