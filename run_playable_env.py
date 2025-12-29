@@ -192,14 +192,17 @@ def create_action_log(action_log_dir, action_log):
 def main(basepath: str, unet_model_folder: str, vae_model_folder: str, start_from_pixels: bool, 
          num_inference_steps: int, num_episode_steps: int | None, gif_rec: bool, rec_path_wo_ext: str,
          discretized_noise_level: int, action_log_dir: str, conduct_headless_test: bool,
-         action_key_for_headless: int) -> None:
-    device = torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
+         action_key_for_headless: int, device_override: str) -> None:
+    if device_override:
+        device = torch.device(device_override)
+    else:
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
+        )
 
     # Specify actions
     turn_left = "a"
@@ -433,10 +436,17 @@ if __name__ == "__main__":
     parser.add_argument('--cv2_rec', action='store_true')
     parser.add_argument('--gif_rec', action='store_true')
     parser.add_argument('--rec_path_wo_ext', type=str, default='recorded_play')
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Device name to override the automatic device setting. "
+             "If None, use the automatic device setting.",
+    )
 
     args = parser.parse_args()
     set_seed(args.seed)
     main(args.dataset_basepath, args.unet_model_folder, args.vae_ft_model_folder, args.start_from_pixels,
          args.num_inference_steps, args.num_episode_steps, args.gif_rec, args.rec_path_wo_ext,
          args.discretized_noise_level, args.action_log_dir, args.conduct_headless_test, 
-         args.action_key_for_headless)
+         args.action_key_for_headless, args.device)
