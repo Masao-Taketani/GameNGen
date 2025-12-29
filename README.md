@@ -194,7 +194,8 @@ pip install keyboard
 After the installation, use the following command to start running the playable environment.
 
 > [!WARNING]
-> If you are running the command remotely without a monitor, always use `--conduct_headless_test` argument to just test the script. In this case, you can also use `--action_key_for_headless` argument to specify an action key to use it repeatly without a monitor.
+> 1. If you are running the command remotely without a monitor, always use `--conduct_headless_test` argument to just test the script. In this case, you can also use `--action_key_for_headless` argument to specify an action key to use it repeatly without a monitor.
+> 2. I haven't tested this playable environment script with UI since I don't have a capable GPU to run the code locally. Thus, there might be some bugs. So, please be aware of that. 
 
 ```
 python run_playable_env.py --dataset_basepath [your parquet or pt path] --num_inference_steps [number of inference steps] --num_episode_steps [number of steps]
