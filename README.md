@@ -16,7 +16,7 @@
 > As for the diffusion model traininig and the VAE decoder fine-tuning, I have used one or two NVIDIA A100 80GB GPU(s). So, please change the batch size or other settings written on the training scripts if you don't have the same GPU(s).
 
 > [!WARNING]
-> As for the data collection process, you are supposed to generate lots of data (about 5 TB by default if I remember collectly). If you don't have enough space for that, modify [the total training time steps](https://github.com/Masao-Taketani/GameNGen/blob/413580ecfe25e98d7ccc5df06d75ce8d20c733ec/ViZDoomPPO/common/envs.py#L233) accordingly.
+> As for the data collection process, you are supposed to generate lots of data (about 5 TB by default if I remember correctly). If you don't have enough space for that, modify [the total training time steps](https://github.com/Masao-Taketani/GameNGen/blob/413580ecfe25e98d7ccc5df06d75ce8d20c733ec/ViZDoomPPO/common/envs.py#L233) accordingly.
 
 This is an unofficial repo of [GameNGen](https://arxiv.org/abs/2408.14837). I have referred to [arnaudstiegler/gameNgen-repro](https://github.com/arnaudstiegler/gameNgen-repro/tree/main) in order to create this repo.
 
